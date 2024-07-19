@@ -12,7 +12,7 @@ include_directories( /home/jang/unitree_mujoco/example/cpp/include
 
 link_libraries(unitree_sdk2 ddsc ddscxx rt pthread)
 
-add_executable(stand_go2 src/communication.cpp src/main.cpp src/controller.cpp)
+add_executable(stand_go2 src/communication.cpp src/main.cpp src/controller.cpp src/MPC.cpp src/WBIC.cpp)
 
 target_link_libraries(stand_go2 OsqpEigen::OsqpEigen mujoco::mujoco pinocchio::pinocchio glfw)
 

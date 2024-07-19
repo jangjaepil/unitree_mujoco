@@ -1,19 +1,9 @@
 #include <controller.hpp>
-
+#include <thread>
 
 controller::controller()
 {
-    
-
-    
-    // wholeM<<mobile_mass, Z37,
-    //        Z37.transpose(),M_j_;
-
-    
-
- 
-    
-
+   
 }
 
 void controller::State2Vector(const unitree_go::msg::dds_::LowState_ low_state, const unitree_go::msg::dds_::SportModeState_ high_state)
@@ -155,13 +145,26 @@ void controller::State2Vector(const unitree_go::msg::dds_::LowState_ low_state, 
     q(5) = imu_quat.z();
     q(6) = imu_quat.w();
 
+
     dq(0) = base_vel(0); //ref: body frame
     dq(1) = base_vel(1);
     dq(2) = base_vel(2);
     dq(3) = base_ang_vel(0); // ref: body frame
     dq(4) = base_ang_vel(1);
     dq(5) = base_ang_vel(2);
+    
+    Eigen::VectorXd euler_angle = imu_quat.toRotationMatrix().eulerAngles(0,1,2); //roll pitch yaw
+    Eigen::Matrix3d wRb = imu_quat.toRotationMatrix();
+    
+    
+    Rz <<cos(euler_angle(2)), 0, -sin(euler_angle(2)),  0,
+                        0, 1, 0, 0,
+                        sin(euler_angle(2)), 0, cos(euler_angle(2)), 0,
+                        0, 0, 0, 1;
 
+    Rz = Eigen::Matrix3d::Identity(3,3);
+    mpc_states<< euler_angle,base_pos, wRb*base_ang_vel, wRb*base_vel,0,0,-9.8;//euler angle,position,angular velocity, linear velocity, gravity
+    mpc_states<<0,0,0,0,0,1,0,0,0,0,0,0,0,0,-9.8*47;
     //std::cout<<"q: "<<q.transpose()<<std::endl;
         
     //std::cout<<"q: \n"<<q.transpose()<<std::endl;
@@ -174,12 +177,13 @@ void controller::State2Vector(const unitree_go::msg::dds_::LowState_ low_state, 
     //std::cout<<"high_state_pos: "<<high_state.position()[0]<<std::endl;
     //std::cout<<"base_pos: \n"<<base_pos.transpose()<<std::endl;
     //std::cout<<"base_vel: \n"<<base_vel.transpose()<<std::endl;
+   
 
 }
 
 void controller::getmodel(pinocchio::Model &model, pinocchio::Data &data)
 {
-    std::cout<<"q: "<<q.transpose()<<std::endl;
+    //std::cout<<"q: "<<q.transpose()<<std::endl;
     Eigen::MatrixXd M_j_;
     Eigen::MatrixXd C_j_;
     Eigen::VectorXd G_j_;
@@ -202,7 +206,9 @@ void controller::getmodel(pinocchio::Model &model, pinocchio::Data &data)
     frame_name[3] = "right_elbow_link";
     frame_name[4] = "left_elbow_link";
     pinocchio::FrameIndex tcp_idx[5];
-        
+    
+    iteration = iteration +1;
+    r.clear();
     for(int i = 0;i<length;i++)
     {
         tcp_idx[i] = model.getFrameId(frame_name[i]);
@@ -215,7 +221,22 @@ void controller::getmodel(pinocchio::Model &model, pinocchio::Data &data)
         pinocchio::updateFramePlacements(model, data);
     
         position = data.oMf[tcp_idx[i]].translation();
-        std::cout<<" position " <<i<<": "<<position.transpose()<<std::endl;
+        position<<0,0,0;
+        if(iteration%2 == 0)
+        {
+           if(i==1||i==3||i==4||i==0)
+           {
+             r.push_back(position);
+           }
+        }
+        else
+        {
+            if(i==1||i==3)
+           {
+             r.push_back(position);
+           }
+        } 
+        
         //j = jacobian_tmp;
         //j_dot = jacobian_dot_tmp;
         //jt = j.block(0,0,3,7);
@@ -223,6 +244,15 @@ void controller::getmodel(pinocchio::Model &model, pinocchio::Data &data)
         //vel = R_m*jt*q_dot;
         //twist = R_m_e*j*q_dot + mobile_twist;
     }
+    
+    
+        
+}
+
+void controller::setJacobian()
+{
+    alljacobian.clear();
+    alljacobian.push_back();
 }
 
 void controller::run()
@@ -236,27 +266,66 @@ void controller::run()
 
     // Number of physical joints (excluding the virtual root and floating base joint)
     number_of_joints = total_joints - 2;
+    
+    // // Print the joint information
+    // std::cout << "Total number of joints (including virtual root and floating base joint): " << total_joints << std::endl;
+    // std::cout << "Number of physical joints: " << number_of_joints << std::endl;
 
-    // Print the joint information
-    std::cout << "Total number of joints (including virtual root and floating base joint): " << total_joints << std::endl;
-    std::cout << "Number of physical joints: " << number_of_joints << std::endl;
-
-    // Optionally, list all joints with their IDs and names
-    std::cout << "List of joints (ID and Name):" << std::endl;
-    for (int joint_id = 0; joint_id < total_joints; ++joint_id) {
-        std::string joint_name = model.names[joint_id];
-        std::cout << "Joint ID " << joint_id << ": Name = " << joint_name << std::endl;
-    }
+    // // Optionally, list all joints with their IDs and names
+    // std::cout << "List of joints (ID and Name):" << std::endl;
+    // for (int joint_id = 0; joint_id < total_joints; ++joint_id) {
+    //     std::string joint_name = model.names[joint_id];
+    //     std::cout << "Joint ID " << joint_id << ": Name = " << joint_name << std::endl;
+    // }
     
     q = Eigen::VectorXd::Zero(number_of_joints + 6+1);
     dq = Eigen::VectorXd::Zero(number_of_joints + 6);
     tau = Eigen::VectorXd::Zero(number_of_joints);
+    unsigned int dof = 6 + number_of_joints;
+    unsigned int nt = 4; // body orientation task, CoM position task, swing foot positin task, joint position
+    std::vector<Eigen::VectorXd> kp;
+    std::vector<Eigen::VectorXd> kd;
+    Eigen::MatrixXd kp_temp = Eigen::MatrixXd::Identity(dof,dof);
+    Eigen::MatrixXd kd_temp = 0.1*Eigen::MatrixXd::Identity(dof,dof);
+    
+    for(int i = 0;i<nt;i++)
+    {
+        kp.push_back(kp_temp);
+        kd.push_back(kd_temp);
+    }
+
+
+    double delT = 0.04;
+    double m = 47;
+    double Fc = 1;
+    Eigen::Matrix3d bI = 80*Eigen::MatrixXd::Identity(3,3);
+ 
+    MPC mpc;
+    WBIC wbic;
     
     while (1)
     {
+        
         State2Vector(getLowState(),getHighState());
+        Eigen::Matrix3d gI = Rz*bI*Rz.transpose();
         getmodel(model, data);
-        //sleep(1);
-    }
 
+        OsqpEigen::Solver qp;
+        mpc.init(mpc_states,delT,Rz,gI,r,m,qp); 
+        mpc.solveProblem(qp);
+        Eigen::VectorXd Fr = mpc.getCtr();
+        std::cout<<"Fr: "<<Fr.transpose()<<std::endl;
+        qp.clearSolver();
+
+        rSize = r.size();
+        Eigen::MatrixXd q1 = Eigen::MatrixXd::Identity(rSize,rSize);
+        Eigen::MatrixXd q2 = Eigen::MatrixXd::Identity(rSize,rSize);
+        
+        controller::setJacobian();
+
+        OsqpEigen::Solver qp;
+        wbic.WBIC_Init(nt, dof,  q1, q2,  kp, kd,  Fr, alljacobian, a,  b,  Fc);
+        // controller::WBIC_solve_problem();
+        qp.clear();
+    }
 }

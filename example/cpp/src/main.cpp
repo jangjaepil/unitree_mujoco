@@ -11,9 +11,9 @@ int main(int argc, const char **argv)
         ChannelFactory::Instance()->Init(0, argv[1]);
     }
     std::cout << "Press enter to start";
-    std::cin.get();
+    // std::cin.get();
     controller controller;
-    controller.Init();
+    controller.Init(); // communication init
     controller.run();
     
     return 0;
