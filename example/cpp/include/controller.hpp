@@ -23,12 +23,20 @@ class controller : public Comm,public MPC,public WBIC{
             Eigen::VectorXd base_vel = Eigen::VectorXd::Zero(3); 
             Eigen::VectorXd mpc_states = Eigen::VectorXd::Zero(15);
             Eigen::Matrix3d Rz = Eigen::MatrixXd::Identity(3,3);
-            Eigen::VectorXd r1 = Eigen::VectorXd::Zero(3);
-            Eigen::VectorXd r2 = Eigen::VectorXd::Zero(3);
+            Eigen::MatrixXd a;
+            Eigen::VectorXd b;
+            Eigen::VectorXd g;
+
             std::vector<Eigen::VectorXd> r;
             std::vector<Eigen::MatrixXd> alljacobian;
-            Eigen::MatrixXd a;
-            Eigen::MatrixXd b;
+            std::vector<Eigen::VectorXd> alldesired_x;
+            std::vector<Eigen::VectorXd> alldesired_x_dot;
+            std::vector<Eigen::VectorXd> alldeisred_x_2dot;
+            std::vector<Eigen::VectorXd> allx;
+            std::vector<Eigen::VectorXd> allx_dot;
             int rSize = 0;
             unsigned int iteration = 0;
+
+            Eigen::VectorXd motor_cmd;
+        
 };

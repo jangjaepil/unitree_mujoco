@@ -5,7 +5,7 @@ void WBIC::WBIC_setJacobianMatrices(std::vector<Eigen::MatrixXd>& alljacobian)
     this -> jacobians = alljacobian;
 }
 
-void WBIC::WBIC_setModel(Eigen::MatrixXd& a,Eigen::MatrixXd& b, Eigen::VectorXd g)
+void WBIC::WBIC_setModel(Eigen::MatrixXd& a,Eigen::VectorXd& b, Eigen::VectorXd& g)
 {
     this -> A = a;
     this -> B = b;
@@ -142,7 +142,9 @@ void WBIC::WBIC_setCartesianCommands(std::vector<Eigen::VectorXd>& alldesired_x,
     {
         this-> del_x.push_back(alldesired_x[i] - allx[i]);
         this-> desired_x_2dot.push_back(alldeisred_x_2dot[i] + Kp[i]*(del_x[i]) + Kd[i]*(alldesired_x_dot[i] - allx_dot[i]));
-    }    
+    } 
+
+    WBIC_setTaskGains(Kp,Kd);   
 }
 
 void WBIC::WBIC_castWBIC2qpHessian(unsigned int& dof,Eigen::MatrixXd& q1,Eigen::MatrixXd& q2,Eigen::VectorXd& Fr)
@@ -162,7 +164,7 @@ void WBIC::WBIC_castWBIC2qpHessian(unsigned int& dof,Eigen::MatrixXd& q1,Eigen::
     }
 }
 void WBIC::WBIC_castWBIC2qpConstraintMatrix(unsigned int& dof, Eigen::VectorXd& Fr, std::vector<Eigen::MatrixXd>& alljacobian, 
-                                Eigen::MatrixXd& a,Eigen::MatrixXd& b, float& Fc)
+                                Eigen::MatrixXd& a, double& Fc)
 {
     this -> linearMatrix.resize(6 + dof + 6*Fr.size(),2*Fr.size()+ dof + 6);
     Eigen::MatrixXd LinearMatrix = Eigen::MatrixXd::Zero(6 + dof + 6*Fr.size(),2*Fr.size()+ dof + 6);
@@ -196,31 +198,74 @@ void WBIC::WBIC_castWBIC2qpConstraintMatrix(unsigned int& dof, Eigen::VectorXd& 
     
 }
 
+void WBIC::WBIC_castWBIC2qpConstraintVector(unsigned int dof, Eigen::VectorXd& Fr, Eigen::VectorXd& desired_q_2dot,Eigen::VectorXd& b
+                                        ,Eigen::VectorXd& g)
+{
+    
+    Eigen::VectorXd lower
+        = Eigen::MatrixXd::Zero(dof + 6 + 2*3*Fr.size(), 1);
+    Eigen::VectorXd upper
+        = Eigen::MatrixXd::Zero(dof + 6 + 2*3*Fr.size(), 1);
+    
+    Eigen::MatrixXd Sf = Eigen::MatrixXd::Zero(6,dof);
+    Sf.block(0,0,6,6) = Eigen::MatrixXd::Identity(6,6);
+
+    if(Fr.size()!=0)
+    {   
+        Eigen::VectorXd MinusInfinity = Eigen::VectorXd::Zero(Fr.size());
+        for(int i = 0;i<Fr.size();i++)
+        {
+            MinusInfinity(i) = -OsqpEigen::INFTY;
+        }
+
+        lowerBound << desired_q_2dot, -Sf*b-Sf*g,Fr,MinusInfinity;;
+        upperBound << desired_q_2dot, -Sf*b-Sf*g,Fr,Eigen::VectorXd::Zero(Fr.size());
+        
+
+    }
+    else
+    {
+        lowerBound << desired_q_2dot, -Sf*b-Sf*g;
+        upperBound << desired_q_2dot, -Sf*b-Sf*g;
+    }
+   
+}
+
 void WBIC::WBIC_castWBIC2qpGradient(unsigned int& dof, Eigen::VectorXd& Fr)
 {
     gradient.resize(2*Fr.size() + dof + 6);
     this -> gradient = Eigen::VectorXd::Zero(2*Fr.size() + dof + 6);
 }
 
-void WBIC::WBIC_setFrictinConstant(float& Fc)
+void WBIC::WBIC_setFrictinConstant(double& Fc)
 {
     this -> fc = Fc;
 }
-bool WBIC::WBIC_Init(unsigned int& nt, unsigned int& dof, Eigen::MatrixXd& q1,Eigen::MatrixXd& q2, std::vector<Eigen::MatrixXd>& kp,
-                                std::vector<Eigen::MatrixXd>& kd, Eigen::VectorXd& Fr, std::vector<Eigen::MatrixXd>&alljacobian,
-                                Eigen::MatrixXd& a, Eigen::MatrixXd& b, float& Fc)
+
+bool WBIC::WBIC_Init(unsigned int& nt, unsigned int& dof, Eigen::MatrixXd& q1,Eigen::MatrixXd& q2, Eigen::VectorXd& Fr, std::vector<Eigen::MatrixXd>&alljacobian,
+                                Eigen::MatrixXd& a, Eigen::VectorXd& b, Eigen::VectorXd& g,double& Fc, Eigen::VectorXd Q,Eigen::VectorXd Q_dot
+                                ,OsqpEigen::Solver& solver)
 {
     this-> Nt = nt;
     this-> Dof = dof;
-
+    this-> fc = Fc;
+    
+    WBIC_setModel(a,b,g);
+    WBIC_setJointStates(Q, Q_dot);
     WBIC_setFrictinConstant(Fc);
     WBIC_setWeightMatrices(q1,q2);
-    WBIC_setTaskGains(kp,kd);
+    
+    WBIC_setJacobianMatrices(alljacobian);
+    WBIC_setJpre(nt,dof,alljacobian);
+    
+    WBIC_getJointCommands(nt, dof, alljacobian, Jpres, del_x, desired_x_dot, desired_x_2dot, a, Q, Q_dot);
+    
+    
     WBIC_castWBIC2qpHessian(dof,q1,q2,Fr);
     WBIC_castWBIC2qpGradient(dof,Fr);
-    WBIC_castWBIC2qpConstraintMatrix(dof, Fr, alljacobian, a, b, Fc);
-
-    solver.settings()->setWarmStart(true);
+    WBIC_castWBIC2qpConstraintMatrix(dof, Fr, alljacobian, a, Fc);
+    WBIC_castWBIC2qpConstraintVector(dof, Fr, desired_q_2dot, b, g);
+    solver.settings()->setWarmStart(false);
 
     std::cout<<" set the initial data of the QP solver"<<std::endl;
     solver.data()->setNumberOfVariables(6 + dof + 2*Fr.size());
@@ -243,16 +288,20 @@ bool WBIC::WBIC_Init(unsigned int& nt, unsigned int& dof, Eigen::MatrixXd& q1,Ei
     return 0;
 }
 
-bool WBIC::WBIC_solve_problem(unsigned int& dof, Eigen::VectorXd& Fr)
+Eigen::VectorXd WBIC::WBIC_solve_problem(unsigned int& dof, Eigen::VectorXd& Fr,Eigen::MatrixXd& P,Eigen::MatrixXd& D,OsqpEigen::Solver& solver)
 {
     // solve the QP problem
-        if (solver.solveProblem() != OsqpEigen::ErrorExitFlag::NoError)
-            return 1;
-
+    solver.solveProblem();
+    
     // get the controller input
     QPSolution = solver.getSolution();
     ctr.resize(dof + Fr.size());
     ctr = QPSolution.block(6 + Fr.size(), 0, dof + Fr.size(), 1);
     
-    return 0;
+    q2dot = ctr.block(0,0,dof,1);
+    desired_fr = ctr.block(dof,0,Fr.size(),1);
+    tau = A*q2dot + B + G - jacobians[0].transpose()*desired_fr;
+    
+    motor_cmd = P*(desired_q - q) + D*(desired_q_dot - q_dot) + tau.block(6,0,dof-6,1); // this could be chaged : tau.block(6,0,dof-6,1) 
+    return motor_cmd;
 }

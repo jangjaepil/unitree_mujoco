@@ -5,16 +5,16 @@
 class WBIC  
 {
 public:
-    bool WBIC_Init(unsigned int& nt, unsigned int& dof, Eigen::MatrixXd& q1,Eigen::MatrixXd& q2, std::vector<Eigen::MatrixXd>& kp,
-                                std::vector<Eigen::MatrixXd>& kd, Eigen::VectorXd& Fr, std::vector<Eigen::MatrixXd>&alljacobian,
-                                Eigen::MatrixXd& a, Eigen::MatrixXd& b, float& Fc);
-    bool WBIC_solve_problem(unsigned int& dof, Eigen::VectorXd& Fr);
+    bool WBIC_Init(unsigned int& nt, unsigned int& dof, Eigen::MatrixXd& q1,Eigen::MatrixXd& q2, Eigen::VectorXd& Fr, std::vector<Eigen::MatrixXd>&alljacobian,
+                                Eigen::MatrixXd& a, Eigen::VectorXd& b, Eigen::VectorXd& g,double& Fc, Eigen::VectorXd Q,Eigen::VectorXd Q_dot
+                                ,OsqpEigen::Solver& solver);
+    Eigen::VectorXd WBIC_solve_problem(unsigned int& dof, Eigen::VectorXd& Fr, Eigen::MatrixXd& P,Eigen::MatrixXd& D,OsqpEigen::Solver& solver);
     void WBIC_setWeightMatrices(Eigen::MatrixXd& Qr,Eigen::MatrixXd& Qi);
-    void WBIC_setModel(Eigen::MatrixXd& A,Eigen::MatrixXd& b, Eigen::VectorXd g);
+    void WBIC_setModel(Eigen::MatrixXd& A,Eigen::VectorXd& b, Eigen::VectorXd& g);
     void WBIC_setJacobianMatrices(std::vector<Eigen::MatrixXd>& alljacobian);
     void WBIC_setJpre(unsigned int& Nt, unsigned int& Dof,std::vector<Eigen::MatrixXd>& alljacobian);
     void WBIC_setJointStates(Eigen::VectorXd& q,Eigen::VectorXd& q_dot);
-    void WBIC_setFrictinConstant(float& Fc);
+    void WBIC_setFrictinConstant(double& Fc);
     Eigen::MatrixXd WBIC_pseudoInverse(Eigen::MatrixXd& A);
     Eigen::MatrixXd WBIC_DCpseudoInverse(Eigen::MatrixXd& J,Eigen::MatrixXd& A);
     void WBIC_getJointCommands(unsigned int& Nt, unsigned int& Dof,std::vector<Eigen::MatrixXd>& alljacobian,std::vector<Eigen::MatrixXd>& allJpre,
@@ -31,8 +31,9 @@ public:
     void WBIC_castWBIC2qpHessian(unsigned int& dof,Eigen::MatrixXd& q1,Eigen::MatrixXd& q2,Eigen::VectorXd& Fr);
     void WBIC_castWBIC2qpGradient(unsigned int& dof, Eigen::VectorXd& Fr);
     void WBIC_castWBIC2qpConstraintMatrix(unsigned int& dof, Eigen::VectorXd& Fr, std::vector<Eigen::MatrixXd>& alljacobian, 
-                                Eigen::MatrixXd& a,Eigen::MatrixXd& b, float& Fc);
-   
+                                Eigen::MatrixXd& a, double& Fc);
+    void WBIC_castWBIC2qpConstraintVector(unsigned int dof, Eigen::VectorXd& Fr, Eigen::VectorXd& desired_q_2dot,Eigen::VectorXd& b
+                                        ,Eigen::VectorXd& g);
     void WBIC_setTaskGains(std::vector<Eigen::MatrixXd>& kp, std::vector<Eigen::MatrixXd>& kd);
     // bool WBIC_updateAllConstraint(std::vector<Eigen::MatrixXd>&allProjections,std::vector<Eigen::MatrixXd>&update_jacobian,std::vector<Eigen::VectorXd>& update_x_dot_d,Eigen::VectorXd& update_q,Eigen::MatrixXd& update_Qr,Eigen::MatrixXd& update_Qi);
    
@@ -42,8 +43,8 @@ private:
     
     unsigned int Nt = 0;
     unsigned int Dof = 0; //floating base joint + actual joint
-    float fc = 0; //static friction constant
-    OsqpEigen::Solver solver;
+    double fc = 0; //static friction constant
+    
     
     Eigen::VectorXd QPSolution;
     Eigen::VectorXd ctr;
@@ -79,7 +80,7 @@ private:
     Eigen::VectorXd desired_q;
     Eigen::VectorXd desired_q_dot;
     Eigen::VectorXd desired_q_2dot;
-    //desired contact force/moment & type
+    //desired contact force
     Eigen::VectorXd fr;
     //current states
     Eigen::VectorXd q;
@@ -88,8 +89,14 @@ private:
     std::vector<Eigen::VectorXd> x_dot;
     //floatng base model
     Eigen::MatrixXd A;
-    Eigen::MatrixXd B;
+    Eigen::VectorXd B; //coriollis * q double dot
     Eigen::MatrixXd S;
     Eigen::VectorXd G;
+    //Optimal solutions
+    Eigen::VectorXd q2dot;
+    Eigen::VectorXd desired_fr;
+    //Solutions accounting model
+    Eigen::VectorXd tau;
+    Eigen::VectorXd motor_cmd;
     
 };

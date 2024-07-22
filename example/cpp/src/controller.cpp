@@ -183,17 +183,13 @@ void controller::State2Vector(const unitree_go::msg::dds_::LowState_ low_state, 
 
 void controller::getmodel(pinocchio::Model &model, pinocchio::Data &data)
 {
-    //std::cout<<"q: "<<q.transpose()<<std::endl;
-    Eigen::MatrixXd M_j_;
-    Eigen::MatrixXd C_j_;
-    Eigen::VectorXd G_j_;
     Eigen::VectorXd position;
     //std::cout<<"q  : "<<q.transpose()<<std::endl;
     pinocchio::computeAllTerms(model, data, q, dq);   
-    M_j_ = data.M.triangularView<Eigen::Upper>();
-    M_j_.triangularView<Eigen::StrictlyLower>() = M_j_.transpose();
-    C_j_ = data.C;
-    G_j_ = data.g;
+    a = data.M.triangularView<Eigen::Upper>();
+    a.triangularView<Eigen::StrictlyLower>() = a.transpose();
+    b = data.C*dq;
+    g = data.g;
 
     //std::cout<<"Inertia: "<<M_j_<<std::endl;
     //std::cout<<"Coriolli: "<<C_j_<<std::endl;
@@ -243,17 +239,16 @@ void controller::getmodel(pinocchio::Model &model, pinocchio::Data &data)
         //jt_dot = j_dot.block(0,0,3,7);
         //vel = R_m*jt*q_dot;
         //twist = R_m_e*j*q_dot + mobile_twist;
+
+
     }
     
-    
+    //Set task Jacobians
+    //Set deisred task input
+    //Set current task states
         
 }
 
-void controller::setJacobian()
-{
-    alljacobian.clear();
-    alljacobian.push_back();
-}
 
 void controller::run()
 {   
@@ -283,11 +278,11 @@ void controller::run()
     tau = Eigen::VectorXd::Zero(number_of_joints);
     unsigned int dof = 6 + number_of_joints;
     unsigned int nt = 4; // body orientation task, CoM position task, swing foot positin task, joint position
-    std::vector<Eigen::VectorXd> kp;
-    std::vector<Eigen::VectorXd> kd;
+    std::vector<Eigen::MatrixXd> kp;
+    std::vector<Eigen::MatrixXd> kd;
     Eigen::MatrixXd kp_temp = Eigen::MatrixXd::Identity(dof,dof);
     Eigen::MatrixXd kd_temp = 0.1*Eigen::MatrixXd::Identity(dof,dof);
-    
+        
     for(int i = 0;i<nt;i++)
     {
         kp.push_back(kp_temp);
@@ -303,7 +298,7 @@ void controller::run()
     MPC mpc;
     WBIC wbic;
     
-    while (1)
+    while (1) //using threads? or other iterruptor to maintain the controll rate as delT
     {
         
         State2Vector(getLowState(),getHighState());
@@ -321,11 +316,21 @@ void controller::run()
         Eigen::MatrixXd q1 = Eigen::MatrixXd::Identity(rSize,rSize);
         Eigen::MatrixXd q2 = Eigen::MatrixXd::Identity(rSize,rSize);
         
-        controller::setJacobian();
+        
+        
+        OsqpEigen::Solver QP;
+    
+        wbic.WBIC_setCartesianCommands(alldesired_x, alldesired_x_dot, alldeisred_x_2dot, allx, allx_dot, kp, kd);
+        wbic.WBIC_Init(nt, dof,  q1, q2, Fr, alljacobian, a, b, g, Fc, q, dq ,QP);
+        
 
-        OsqpEigen::Solver qp;
-        wbic.WBIC_Init(nt, dof,  q1, q2,  kp, kd,  Fr, alljacobian, a,  b,  Fc);
-        // controller::WBIC_solve_problem();
-        qp.clear();
+        Eigen::MatrixXd  P  = Eigen::MatrixXd::Identity(dof - 6,dof - 6);
+        Eigen::MatrixXd  D  = Eigen::MatrixXd::Identity(dof - 6,dof - 6);
+        Eigen::VectorXd tau_cmd = wbic.WBIC_solve_problem(dof, Fr, P, D, QP);
+        std::cout<<"tau_cmd: "<<tau_cmd.transpose()<<std::endl;
+        QP.clearSolver();
+        
+       //transfer the tau_cmds to the real robot using communcation
+
     }
 }
