@@ -227,7 +227,7 @@ double MPC::getErrorNorm(const Eigen::VectorXd& x, const Eigen::VectorXd& xRef)
     // return the norm
     return error.norm();
 }
-bool MPC::init(Eigen::VectorXd& x_init,double delT, Eigen::Matrix3d& Rz, Eigen::Matrix3d& gI, std::vector<Eigen::VectorXd>& r,double m,OsqpEigen::Solver& solver)
+bool MPC::init(Eigen::VectorXd& x_init,Eigen::VectorXd& x_ref,double delT, Eigen::Matrix3d& Rz, Eigen::Matrix3d& gI, std::vector<Eigen::VectorXd>& r,double m,OsqpEigen::Solver& solver)
 {   
     mpcWindow = 10;
     int rSize = r.size();
@@ -235,8 +235,8 @@ bool MPC::init(Eigen::VectorXd& x_init,double delT, Eigen::Matrix3d& Rz, Eigen::
      std::cout<<"rSize: "<<rSize<<std::endl;
      std::cout<<"set the initial and the desired states"<<std::endl;
     x0  = x_init;
-    xRef = x_init;
-    xRef << 0,0,0,0,0,2,0,0,0,0,0,10,0,0,-9.8*m;
+    xRef = x_ref;
+    
 
 
     std::cout<<"set MPC problem quantities"<<std::endl;

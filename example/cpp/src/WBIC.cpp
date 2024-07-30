@@ -69,16 +69,17 @@ Eigen::MatrixXd WBIC::WBIC_DCpseudoInverse(Eigen::MatrixXd& J,Eigen::MatrixXd& A
     return J_dcinv;
 }
 
-void WBIC::WBIC_setJpre(unsigned int& Nt, unsigned int& Dof,std::vector<Eigen::MatrixXd>& alljacobian)
+void WBIC::WBIC_setJpre(unsigned int& nt, unsigned int& Dof,std::vector<Eigen::MatrixXd>& alljacobian)
 {
     Eigen::MatrixXd I = Eigen::MatrixXd::Identity(Dof,Dof);
     std::vector<Eigen::MatrixXd> allJpre;
     Eigen::MatrixXd Jpre;
-    Eigen::MatrixXd N0;
+    Eigen::MatrixXd N0 = Eigen::MatrixXd::Identity(Dof,Dof);
     Eigen::MatrixXd Ni;
 
     allJpre.clear();
-    for(int i = 0;i<Nt;i++)
+    std::cout<<"nt: "<<nt<<std::endl;
+    for(int i = 0;i<nt-1;i++)
     {
         
         if(i==0)
@@ -99,7 +100,7 @@ void WBIC::WBIC_setJpre(unsigned int& Nt, unsigned int& Dof,std::vector<Eigen::M
     this -> Jpres = allJpre;
 }
 
-void WBIC::WBIC_getJointCommands(unsigned int& Nt, unsigned int& Dof,std::vector<Eigen::MatrixXd>& alljacobian,std::vector<Eigen::MatrixXd>& allJpre,
+void WBIC::WBIC_getJointCommands(unsigned int& nt, unsigned int& Dof,std::vector<Eigen::MatrixXd>& alljacobian,std::vector<Eigen::MatrixXd>& allJpre,
                                 std::vector<Eigen::VectorXd>& alldel_x,
                                 std::vector<Eigen::VectorXd>& alldeisred_x_dot,
                                 std::vector<Eigen::VectorXd>& alldeisred_x_2dot,
@@ -112,7 +113,13 @@ void WBIC::WBIC_getJointCommands(unsigned int& Nt, unsigned int& Dof,std::vector
 
     Desired_q_2dot = WBIC_DCpseudoInverse(alljacobian[0],a)*(-alljacobian[0]*Q_dot);
     
-    for(int i = 0; i<Nt ; i++)
+    std::cout<<"joint commands iter start"<<std::endl;
+    std::cout<<"Jpre 1: \n"<<allJpre[0]<<std::endl;
+    std::cout<<"Jpre 2: \n"<<allJpre[1]<<std::endl;
+    std::cout<<"Jaboian 0: \n"<<alljacobian[0]<<std::endl;
+    std::cout<<"Jaboian 1: \n"<<alljacobian[1]<<std::endl;
+    std::cout<<"Jaboian 2: \n"<<alljacobian[2]<<std::endl;
+    for(int i = 0; i<nt-1; i++)
     {
         Delq = Delq + allJpre[i]*(alldel_x[i] - alljacobian[i+1]*Delq);
         Desired_q_dot = Desired_q_dot + allJpre[i]*(alldeisred_x_dot[i] - alljacobian[i+1]*Desired_q_dot);
@@ -125,8 +132,8 @@ void WBIC::WBIC_getJointCommands(unsigned int& Nt, unsigned int& Dof,std::vector
     this->desired_q_2dot = Desired_q_2dot;
 }
 
-void WBIC::WBIC_setCartesianCommands(std::vector<Eigen::VectorXd>& alldesired_x,std::vector<Eigen::VectorXd>& alldesired_x_dot,
-                                std::vector<Eigen::VectorXd>& alldeisred_x_2dot,std::vector<Eigen::VectorXd>& allx,
+void WBIC::WBIC_setCartesianCommands(unsigned int& nt, std::vector<Eigen::VectorXd>& alldesired_x,std::vector<Eigen::VectorXd>& alldesired_x_dot,
+                                std::vector<Eigen::VectorXd>& alldesired_x_2dot,std::vector<Eigen::VectorXd>& allx,
                                 std::vector<Eigen::VectorXd>& allx_dot,
                                 std::vector<Eigen::MatrixXd>& Kp,
                                 std::vector<Eigen::MatrixXd>& Kd)
@@ -138,10 +145,21 @@ void WBIC::WBIC_setCartesianCommands(std::vector<Eigen::VectorXd>& alldesired_x,
     this-> del_x.clear();
     this-> desired_x_2dot.clear();
 
-    for(int i = 0;i<Nt;i++)
-    {
+    
+     std::cout<<"set cartesian commands iter start"<<std::endl;
+    for(int i = 0;i<nt-1;i++)
+    {   
+        std::cout<<"deisred_x: "<<i<<"\n"<<alldesired_x[i].transpose()<<std::endl;
+        std::cout<<"current_x: "<<i<<"\n"<<allx[i].transpose()<<std::endl;
+        std::cout<<"current_x_dot: "<<i<<"\n"<<allx_dot[i].transpose()<<std::endl;
+        
         this-> del_x.push_back(alldesired_x[i] - allx[i]);
-        this-> desired_x_2dot.push_back(alldeisred_x_2dot[i] + Kp[i]*(del_x[i]) + Kd[i]*(alldesired_x_dot[i] - allx_dot[i]));
+        std::cout<<"del_x: "<<i<<"\n"<<del_x[i].transpose()<<std::endl;
+        std::cout<<"deisred_x_dot: "<<i<<"\n"<<alldesired_x_dot[i].transpose()<<std::endl;
+        std::cout<<"deisred_x_2dot: "<<i<<"\n"<<alldesired_x_2dot[i].transpose()<<std::endl;
+        
+        this-> desired_x_2dot.push_back(alldesired_x_2dot[i] + Kp[i]*(del_x[i]) + Kd[i]*(alldesired_x_dot[i] - allx_dot[i]));
+        std::cout<<i<<std::endl;
     } 
 
     WBIC_setTaskGains(Kp,Kd);   
@@ -149,25 +167,37 @@ void WBIC::WBIC_setCartesianCommands(std::vector<Eigen::VectorXd>& alldesired_x,
 
 void WBIC::WBIC_castWBIC2qpHessian(unsigned int& dof,Eigen::MatrixXd& q1,Eigen::MatrixXd& q2,Eigen::VectorXd& Fr)
 {
-    hessian.resize(q1.cols()+q2.cols()+ dof + Fr.size(),q1.cols()+q2.cols()+ dof + Fr.size());
     
-    for(int i = 0;i<q1.cols()+q2.cols();i++)
-    {
-        if(i<q1.cols())
-        {
-            hessian.insert(i,i) = q1(i,i);
-        }
-        else
-        {
-            hessian.insert(i,i) = q2(i-q1.cols(),i-q1.cols());
-        }
-    }
+    
+    hessian.resize(6 + dof + 2*Fr.size(),6 + dof + 2*Fr.size());
+    // Eigen::MatrixXd Hessian = Eigen::MatrixXd::Identity(6 + dof + 2*Fr.size(),6 + dof + 2*Fr.size());
+    
+    // Hessian.block(0,0,Fr.size(),Fr.size()) = q1;
+    // Hessian.block(Fr.size(),Fr.size(),6,6) = q2;
+
+
+    //hessian = Hessian.sparseView();
+     for(int i = 0;i<2*Fr.size()+6+dof;i++)
+     {
+         if(i<Fr.size())
+         {
+             hessian.insert(i,i) = q1(i,i);
+         }
+         else if(i<Fr.size()+6) 
+         {
+             hessian.insert(i,i) = q2(i-Fr.size(), i-Fr.size());
+         }
+         else
+         {
+            hessian.insert(i,i) = 1;
+         }
+     }
 }
 void WBIC::WBIC_castWBIC2qpConstraintMatrix(unsigned int& dof, Eigen::VectorXd& Fr, std::vector<Eigen::MatrixXd>& alljacobian, 
                                 Eigen::MatrixXd& a, double& Fc)
 {
-    this -> linearMatrix.resize(6 + dof + 6*Fr.size(),2*Fr.size()+ dof + 6);
-    Eigen::MatrixXd LinearMatrix = Eigen::MatrixXd::Zero(6 + dof + 6*Fr.size(),2*Fr.size()+ dof + 6);
+    this -> linearMatrix.resize(6 + dof + Fr.size() + 5*Fr.size()/3,2*Fr.size()+ dof + 6);
+    Eigen::MatrixXd LinearMatrix = Eigen::MatrixXd::Zero(6 + dof + Fr.size() + 5*Fr.size()/3,2*Fr.size()+ dof + 6);
     
     Eigen::MatrixXd Sf = Eigen::MatrixXd::Zero(6,dof);
     Sf.block(0,0,6,6) = Eigen::MatrixXd::Identity(6,6);
@@ -202,29 +232,38 @@ void WBIC::WBIC_castWBIC2qpConstraintVector(unsigned int dof, Eigen::VectorXd& F
                                         ,Eigen::VectorXd& g)
 {
     
-    Eigen::VectorXd lower
-        = Eigen::MatrixXd::Zero(dof + 6 + 2*3*Fr.size(), 1);
-    Eigen::VectorXd upper
-        = Eigen::MatrixXd::Zero(dof + 6 + 2*3*Fr.size(), 1);
+    
     
     Eigen::MatrixXd Sf = Eigen::MatrixXd::Zero(6,dof);
     Sf.block(0,0,6,6) = Eigen::MatrixXd::Identity(6,6);
 
     if(Fr.size()!=0)
     {   
-        Eigen::VectorXd MinusInfinity = Eigen::VectorXd::Zero(Fr.size());
-        for(int i = 0;i<Fr.size();i++)
+        std::cout<<"contact detected"<<std::endl;    
+        Eigen::VectorXd MinusInfinity = Eigen::VectorXd::Zero(5*Fr.size()/3);
+        Eigen::VectorXd zero = Eigen::VectorXd::Zero(5*Fr.size()/3);
+        
+        lowerBound.resize(dof + 6 + Fr.size() + 5*Fr.size()/3);
+        upperBound.resize(dof + 6 + Fr.size() + 5*Fr.size()/3);
+        
+        for(int i = 0;i<MinusInfinity.size();i++)
         {
             MinusInfinity(i) = -OsqpEigen::INFTY;
         }
+        std::cout<<"set contact constraints"<<std::endl;    
+        Eigen::VectorXd model_constraint = -Sf*b-Sf*g; 
 
-        lowerBound << desired_q_2dot, -Sf*b-Sf*g,Fr,MinusInfinity;;
-        upperBound << desired_q_2dot, -Sf*b-Sf*g,Fr,Eigen::VectorXd::Zero(Fr.size());
+
+        lowerBound << desired_q_2dot, model_constraint, Fr, MinusInfinity;;
+        upperBound << desired_q_2dot, model_constraint, Fr, zero;
         
 
     }
     else
     {
+        lowerBound.resize(dof + 6);
+        upperBound.resize(dof + 6);
+        
         lowerBound << desired_q_2dot, -Sf*b-Sf*g;
         upperBound << desired_q_2dot, -Sf*b-Sf*g;
     }
@@ -251,20 +290,39 @@ bool WBIC::WBIC_Init(unsigned int& nt, unsigned int& dof, Eigen::MatrixXd& q1,Ei
     this-> fc = Fc;
     
     WBIC_setModel(a,b,g);
+    std::cout<<"set model"<<std::endl;
     WBIC_setJointStates(Q, Q_dot);
+    std::cout<<"set Joint states"<<std::endl;
     WBIC_setFrictinConstant(Fc);
+    std::cout<<"set fc"<<std::endl;
     WBIC_setWeightMatrices(q1,q2);
-    
+    std::cout<<"set weight"<<std::endl;
     WBIC_setJacobianMatrices(alljacobian);
+    std::cout<<"set jacobians"<<std::endl;
     WBIC_setJpre(nt,dof,alljacobian);
-    
+    std::cout<<"set jpre"<<std::endl;
     WBIC_getJointCommands(nt, dof, alljacobian, Jpres, del_x, desired_x_dot, desired_x_2dot, a, Q, Q_dot);
+    std::cout<<"get joint commands"<<std::endl;
     
-    
+    std::cout<<"q1: \n"<<q1<<std::endl;
+    std::cout<<"q2: \n"<<q2<<std::endl;
     WBIC_castWBIC2qpHessian(dof,q1,q2,Fr);
+    std::cout<<"set hessian"<<std::endl;
+    std::cout<<hessian<<std::endl;
+    
     WBIC_castWBIC2qpGradient(dof,Fr);
+    std::cout<<"set gradient"<<std::endl;
+    std::cout<<gradient<<std::endl;
+    
     WBIC_castWBIC2qpConstraintMatrix(dof, Fr, alljacobian, a, Fc);
+    std::cout<<"set constraint"<<std::endl;
+    std::cout<<linearMatrix<<std::endl;
+    
     WBIC_castWBIC2qpConstraintVector(dof, Fr, desired_q_2dot, b, g);
+    std::cout<<"set constraint vector"<<std::endl;
+    std::cout<<lowerBound<<std::endl;
+    std::cout<<upperBound<<std::endl;
+    
     solver.settings()->setWarmStart(false);
 
     std::cout<<" set the initial data of the QP solver"<<std::endl;

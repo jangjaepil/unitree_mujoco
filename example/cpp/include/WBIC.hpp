@@ -12,18 +12,18 @@ public:
     void WBIC_setWeightMatrices(Eigen::MatrixXd& Qr,Eigen::MatrixXd& Qi);
     void WBIC_setModel(Eigen::MatrixXd& A,Eigen::VectorXd& b, Eigen::VectorXd& g);
     void WBIC_setJacobianMatrices(std::vector<Eigen::MatrixXd>& alljacobian);
-    void WBIC_setJpre(unsigned int& Nt, unsigned int& Dof,std::vector<Eigen::MatrixXd>& alljacobian);
+    void WBIC_setJpre(unsigned int& nt, unsigned int& Dof,std::vector<Eigen::MatrixXd>& alljacobian);
     void WBIC_setJointStates(Eigen::VectorXd& q,Eigen::VectorXd& q_dot);
     void WBIC_setFrictinConstant(double& Fc);
     Eigen::MatrixXd WBIC_pseudoInverse(Eigen::MatrixXd& A);
     Eigen::MatrixXd WBIC_DCpseudoInverse(Eigen::MatrixXd& J,Eigen::MatrixXd& A);
-    void WBIC_getJointCommands(unsigned int& Nt, unsigned int& Dof,std::vector<Eigen::MatrixXd>& alljacobian,std::vector<Eigen::MatrixXd>& allJpre,
+    void WBIC_getJointCommands(unsigned int& nt, unsigned int& Dof,std::vector<Eigen::MatrixXd>& alljacobian,std::vector<Eigen::MatrixXd>& allJpre,
                                 std::vector<Eigen::VectorXd>& alldel_x,
                                 std::vector<Eigen::VectorXd>& alldeisred_x_dot,
                                 std::vector<Eigen::VectorXd>& alldeisred_x_2dot,
                                 Eigen::MatrixXd& a,Eigen::VectorXd Q,Eigen::VectorXd Q_dot);
-    void WBIC_setCartesianCommands(std::vector<Eigen::VectorXd>& alldesired_x,std::vector<Eigen::VectorXd>& alldesired_x_dot,
-                                std::vector<Eigen::VectorXd>& alldeisred_x_2dot,std::vector<Eigen::VectorXd>& allx,
+    void WBIC_setCartesianCommands(unsigned int& nt, std::vector<Eigen::VectorXd>& alldesired_x,std::vector<Eigen::VectorXd>& alldesired_x_dot,
+                                std::vector<Eigen::VectorXd>& alldesired_x_2dot,std::vector<Eigen::VectorXd>& allx,
                                 std::vector<Eigen::VectorXd>& allx_dot,
                                 std::vector<Eigen::MatrixXd>& Kp,
                                 std::vector<Eigen::MatrixXd>& Kd);

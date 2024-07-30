@@ -42,7 +42,7 @@ public:
                               Eigen::VectorXd& uMin,
                               int rSize);
     void setDynamicsMatrices(double delT, Eigen::Matrix3d& Rz, Eigen::Matrix3d& gI, std::vector<Eigen::VectorXd>& r,double m,int rSize);
-    bool init(Eigen::VectorXd& x_init,double delT, Eigen::Matrix3d& Rz, Eigen::Matrix3d& gI, std::vector<Eigen::VectorXd>& r,double m,OsqpEigen::Solver& solver);
+    bool init(Eigen::VectorXd& x_init,Eigen::VectorXd& x_ref,double delT, Eigen::Matrix3d& Rz, Eigen::Matrix3d& gI, std::vector<Eigen::VectorXd>& r,double m,OsqpEigen::Solver& solver);
     bool solveProblem(OsqpEigen::Solver& solver);
     bool updateProblem(double delT, Eigen::Matrix3d& Rz, Eigen::Matrix3d& gI, Eigen::VectorXd x0, 
                         std::vector<Eigen::VectorXd>& r, double m,OsqpEigen::Solver& solver);

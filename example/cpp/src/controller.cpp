@@ -153,9 +153,9 @@ void controller::State2Vector(const unitree_go::msg::dds_::LowState_ low_state, 
     dq(4) = base_ang_vel(1);
     dq(5) = base_ang_vel(2);
     
-    Eigen::VectorXd euler_angle = imu_quat.toRotationMatrix().eulerAngles(0,1,2); //roll pitch yaw
+    euler_angle = imu_quat.toRotationMatrix().eulerAngles(0,1,2); //roll pitch yaw
     Eigen::Matrix3d wRb = imu_quat.toRotationMatrix();
-    
+    oriVel =  wRb*base_ang_vel; 
     
     Rz <<cos(euler_angle(2)), 0, -sin(euler_angle(2)),  0,
                         0, 1, 0, 0,
@@ -163,7 +163,7 @@ void controller::State2Vector(const unitree_go::msg::dds_::LowState_ low_state, 
                         0, 0, 0, 1;
 
     Rz = Eigen::Matrix3d::Identity(3,3);
-    mpc_states<< euler_angle,base_pos, wRb*base_ang_vel, wRb*base_vel,0,0,-9.8;//euler angle,position,angular velocity, linear velocity, gravity
+    mpc_states<< euler_angle,base_pos, oriVel, wRb*base_vel,0,0,-9.8;//euler angle,position,angular velocity, linear velocity, gravity
     mpc_states<<0,0,0,0,0,1,0,0,0,0,0,0,0,0,-9.8*47;
     //std::cout<<"q: "<<q.transpose()<<std::endl;
         
@@ -183,72 +183,151 @@ void controller::State2Vector(const unitree_go::msg::dds_::LowState_ low_state, 
 
 void controller::getmodel(pinocchio::Model &model, pinocchio::Data &data)
 {
-    Eigen::VectorXd position;
-    //std::cout<<"q  : "<<q.transpose()<<std::endl;
+    
     pinocchio::computeAllTerms(model, data, q, dq);   
+    pinocchio::forwardKinematics(model, data, q);
+    pinocchio::updateFramePlacements(model, data);   
     a = data.M.triangularView<Eigen::Upper>();
     a.triangularView<Eigen::StrictlyLower>() = a.transpose();
     b = data.C*dq;
     g = data.g;
 
-    //std::cout<<"Inertia: "<<M_j_<<std::endl;
-    //std::cout<<"Coriolli: "<<C_j_<<std::endl;
-    //std::cout<<"Gravity: "<<G_j_.transpose()<<std::endl;
-    int length = 5;
-    std::string frame_name[length];
-    frame_name[0] = "pelvis";
-    frame_name[1] = "left_ankle_link";
-    frame_name[2] = "right_ankle_link";
-    frame_name[3] = "right_elbow_link";
-    frame_name[4] = "left_elbow_link";
-    pinocchio::FrameIndex tcp_idx[5];
+    pinocchio::centerOfMass(model,data,q,dq,false);
+    CoM = data.com[0];
+    CoMV = data.vcom[0];
+    Jcom = Eigen::MatrixXd::Zero(6,dof);
+    Jcom = pinocchio::jacobianCenterOfMass(model,data,false);
     
-    iteration = iteration +1;
-    r.clear();
-    for(int i = 0;i<length;i++)
-    {
+  
+    //torso orientation, swing foot position, joint pose? 
+    std::string frame_name[3];
+    frame_name[0] = "torso_link";
+    frame_name[1] = "right_ankle_link";
+    frame_name[2] = "left_ankle_link";
+    
+    pinocchio::FrameIndex tcp_idx[3];
+    jacobian = Eigen::MatrixXd::Zero(6,dof);
+    Jbody = Eigen::MatrixXd::Zero(6,dof);
+    Jrf = Eigen::MatrixXd::Zero(6,dof);
+    Jlf = Eigen::MatrixXd::Zero(6,dof);
+    Jpose = Eigen::MatrixXd::Identity(dof,dof);
+    JbodyOri = Eigen::MatrixXd::Zero(3,dof);
+    Jf = Eigen::MatrixXd::Zero(6,dof);
+    Jf = Eigen::MatrixXd::Zero(6,dof);
+    //contact positions for mpc
+    Eigen::VectorXd rightF  = Eigen::VectorXd::Zero(3);
+    Eigen::VectorXd leftF  = Eigen::VectorXd::Zero(3);
+    Eigen::VectorXd frame_position = Eigen::VectorXd::Zero(3);
+    int length = sizeof(frame_name)/sizeof(frame_name[0]);
+    //std::cout<<"length: "<<length<<std::endl;
+
+    for(int i = 0 ; i<length;i++)
+    {   
         tcp_idx[i] = model.getFrameId(frame_name[i]);
-    
-        //Eigen::MatrixXd jacobian_tmp = Eigen::MatrixXd::Zero(6, model_pino_.nv);
-        //Eigen::MatrixXd jacobian_dot_tmp = Eigen::MatrixXd::Zero(6, model_pino_.nv);
-        //pinocchio::getFrameJacobian(model_pino_, data_pino, tcp_idx, pinocchio::ReferenceFrame::LOCAL_WORLD_ALIGNED, jacobian_tmp);
-        //pinocchio::getFrameJacobianTimeVariation(model_pino_, data_pino, tcp_idx, pinocchio::ReferenceFrame::LOCAL_WORLD_ALIGNED, jacobian_dot_tmp);
-        pinocchio::forwardKinematics(model, data, q);
-        pinocchio::updateFramePlacements(model, data);
-    
-        position = data.oMf[tcp_idx[i]].translation();
-        position<<0,0,0;
-        if(iteration%2 == 0)
-        {
-           if(i==1||i==3||i==4||i==0)
-           {
-             r.push_back(position);
-           }
-        }
-        else
-        {
-            if(i==1||i==3)
-           {
-             r.push_back(position);
-           }
-        } 
         
-        //j = jacobian_tmp;
-        //j_dot = jacobian_dot_tmp;
-        //jt = j.block(0,0,3,7);
-        //jt_dot = j_dot.block(0,0,3,7);
-        //vel = R_m*jt*q_dot;
-        //twist = R_m_e*j*q_dot + mobile_twist;
-
-
+        pinocchio::computeFrameJacobian(model, data, q,tcp_idx[i], pinocchio::ReferenceFrame::WORLD, jacobian);
+        frame_position = data.oMf[tcp_idx[i]].translation();
+        if(i==0) 
+        {   
+            Jbody = jacobian;
+            JbodyOri = jacobian.block(3,0,3,dof);
+        }
+        if(i==1)
+        {
+            Jrf = jacobian;
+            leftF = frame_position;
+        }
+        if(i==2)
+        {
+            Jlf = jacobian;
+            rightF = frame_position;
+        }
     }
     
-    //Set task Jacobians
-    //Set deisred task input
-    //Set current task states
-        
-}
+    
+    Jf.block(0,0,3,dof) = Jrf.block(0,0,3,dof);
+    Jf.block(3,0,3,dof) = Jlf.block(0,0,3,dof);
+    Jc = Jf;
+    //Jp = Eigen::MatrixXd::Zero()
+    std::cout<<"JbodyOri: "<<JbodyOri<<std::endl;
+    std::cout<<"Jrf: "<<Jrf<<std::endl;
+    std::cout<<"Jlf: "<<Jlf<<std::endl;
+    std::cout<<"Jf: "<<Jf<<std::endl;
+    
+    alljacobian.clear();
+    alljacobian.push_back(Jc);
+    alljacobian.push_back(JbodyOri);
+    alljacobian.push_back(Jcom);
+    //alljacobian.push_back(Jf);
+    
+    
+    r.clear();
+    r.push_back(rightF);
+    r.push_back(leftF);
+    
 
+    //Task current states
+    
+    allx.clear();
+    allx_dot.clear();
+
+    allx.push_back(euler_angle);
+    allx_dot.push_back(oriVel);
+
+    allx.push_back(CoM);
+    allx_dot.push_back(CoMV);
+    
+    
+    
+    
+}
+void controller::setDesireds()
+{
+    Eigen::VectorXd DesiredBodyOrientation  = Eigen::VectorXd::Zero(3);
+    Eigen::VectorXd DesiredBodyPosition  = Eigen::VectorXd::Zero(3);
+    Eigen::VectorXd DesiredFootPositions  = Eigen::VectorXd::Zero(6);
+    
+    Eigen::VectorXd DesiredBodyOriVel  = Eigen::VectorXd::Zero(3);
+    Eigen::VectorXd DesiredBodyVel  = Eigen::VectorXd::Zero(3);
+    Eigen::VectorXd DesiredFootVels  = Eigen::VectorXd::Zero(6);
+    
+    Eigen::VectorXd DesiredBodyOriAcc  = Eigen::VectorXd::Zero(3);
+    Eigen::VectorXd DesiredBodyAcc  = Eigen::VectorXd::Zero(3);
+    Eigen::VectorXd DesiredFootAccs  = Eigen::VectorXd::Zero(6);
+    
+
+    DesiredBodyPosition<<0,0,1;
+    DesiredFootPositions<<0,-0.2,0,0,0.2,0;
+    
+    x_ref << DesiredBodyOrientation,DesiredBodyPosition,DesiredBodyOriVel,DesiredBodyVel,0,0,-9.8*47;
+
+    alldesired_x.clear();
+    alldesired_x_dot.clear();
+    alldesired_x_2dot.clear();
+
+    alldesired_x.push_back(DesiredBodyOrientation);
+    alldesired_x.push_back(DesiredBodyPosition);
+    //alldesired_x.push_back(DesiredFootPositions);
+
+    alldesired_x_dot.push_back(DesiredBodyOriVel);
+    alldesired_x_dot.push_back(DesiredBodyVel);
+    //alldesired_x_dot.push_back(DesiredFootVels);
+    
+    alldesired_x_2dot.push_back(DesiredBodyOriAcc);
+    alldesired_x_2dot.push_back(DesiredBodyAcc);
+    //alldeisred_x_2dot.push_back(DesiredFootAccs);
+
+    Eigen::MatrixXd kp_temp = Eigen::MatrixXd::Identity(3,3);
+    Eigen::MatrixXd kd_temp = 0.1*Eigen::MatrixXd::Identity(3,3);
+        
+    for(int i = 0;i<alldesired_x.size();i++)
+    {
+    
+        kp.push_back(kp_temp);
+        kd.push_back(kd_temp);
+    }
+    
+}
 
 void controller::run()
 {   
@@ -266,28 +345,20 @@ void controller::run()
     // std::cout << "Total number of joints (including virtual root and floating base joint): " << total_joints << std::endl;
     // std::cout << "Number of physical joints: " << number_of_joints << std::endl;
 
-    // // Optionally, list all joints with their IDs and names
-    // std::cout << "List of joints (ID and Name):" << std::endl;
-    // for (int joint_id = 0; joint_id < total_joints; ++joint_id) {
-    //     std::string joint_name = model.names[joint_id];
-    //     std::cout << "Joint ID " << joint_id << ": Name = " << joint_name << std::endl;
-    // }
+    // Optionally, list all joints with their IDs and names
+    std::cout << "List of joints (ID and Name):" << std::endl;
+    for (int joint_id = 0; joint_id < total_joints; ++joint_id) {
+        std::string joint_name = model.names[joint_id];
+        std::cout << "Joint ID " << joint_id << ": Name = " << joint_name << std::endl;
+    }
     
     q = Eigen::VectorXd::Zero(number_of_joints + 6+1);
     dq = Eigen::VectorXd::Zero(number_of_joints + 6);
     tau = Eigen::VectorXd::Zero(number_of_joints);
-    unsigned int dof = 6 + number_of_joints;
-    unsigned int nt = 4; // body orientation task, CoM position task, swing foot positin task, joint position
-    std::vector<Eigen::MatrixXd> kp;
-    std::vector<Eigen::MatrixXd> kd;
-    Eigen::MatrixXd kp_temp = Eigen::MatrixXd::Identity(dof,dof);
-    Eigen::MatrixXd kd_temp = 0.1*Eigen::MatrixXd::Identity(dof,dof);
-        
-    for(int i = 0;i<nt;i++)
-    {
-        kp.push_back(kp_temp);
-        kd.push_back(kd_temp);
-    }
+    dof = 6 + number_of_joints;
+    unsigned int nt = 3; // body orientation task, CoM position task, swing foot positin task, joint position
+    
+   
 
 
     double delT = 0.04;
@@ -304,26 +375,26 @@ void controller::run()
         State2Vector(getLowState(),getHighState());
         Eigen::Matrix3d gI = Rz*bI*Rz.transpose();
         getmodel(model, data);
+        setDesireds();
+
 
         OsqpEigen::Solver qp;
-        mpc.init(mpc_states,delT,Rz,gI,r,m,qp); 
+        mpc.init(mpc_states,x_ref,delT,Rz,gI,r,m,qp); 
         mpc.solveProblem(qp);
         Eigen::VectorXd Fr = mpc.getCtr();
         std::cout<<"Fr: "<<Fr.transpose()<<std::endl;
         qp.clearSolver();
 
         rSize = r.size();
-        Eigen::MatrixXd q1 = Eigen::MatrixXd::Identity(rSize,rSize);
-        Eigen::MatrixXd q2 = Eigen::MatrixXd::Identity(rSize,rSize);
-        
+        Eigen::MatrixXd q1 = 10*Eigen::MatrixXd::Identity(3*rSize,3*rSize);
+        Eigen::MatrixXd q2 = 10*Eigen::MatrixXd::Identity(6,6);
         
         
         OsqpEigen::Solver QP;
     
-        wbic.WBIC_setCartesianCommands(alldesired_x, alldesired_x_dot, alldeisred_x_2dot, allx, allx_dot, kp, kd);
+        wbic.WBIC_setCartesianCommands(nt,alldesired_x, alldesired_x_dot, alldesired_x_2dot, allx, allx_dot, kp, kd);
         wbic.WBIC_Init(nt, dof,  q1, q2, Fr, alljacobian, a, b, g, Fc, q, dq ,QP);
         
-
         Eigen::MatrixXd  P  = Eigen::MatrixXd::Identity(dof - 6,dof - 6);
         Eigen::MatrixXd  D  = Eigen::MatrixXd::Identity(dof - 6,dof - 6);
         Eigen::VectorXd tau_cmd = wbic.WBIC_solve_problem(dof, Fr, P, D, QP);
