@@ -8,6 +8,7 @@ class controller : public Comm,public MPC,public WBIC{
             controller();
             void run();
             void State2Vector(const unitree_go::msg::dds_::LowState_ low_state, const unitree_go::msg::dds_::SportModeState_ high_state);
+            void convertCmd(Eigen::MatrixXd& Cmds);
             void getmodel(pinocchio::Model &model, pinocchio::Data &data);
             void setJacobian();
             void setDesireds();

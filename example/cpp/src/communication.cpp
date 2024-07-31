@@ -92,39 +92,27 @@ unitree_go::msg::dds_::SportModeState_ Comm::getHighState()
 }
 
 void Comm::LowCmdWrite()
-{
-
-    runing_time += dt;
-    if (runing_time < 3.0)
+{   
+    double kp = 1;
+    double kd = 0.1;
+    
+    for (int i = 0; i < 20; i++)
     {
-        // Stand up in first 3 second
-
-        // Total time for standing up or standing down is about 1.2s
-        phase = tanh(runing_time / 1.2);
-        for (int i = 0; i < 12; i++)
-        {
-            low_cmd.motor_cmd()[i].q() = phase * stand_up_joint_pos[i] + (1 - phase) * stand_down_joint_pos[i];
-            low_cmd.motor_cmd()[i].dq() = 0;
-            low_cmd.motor_cmd()[i].kp() = phase * 50.0 + (1 - phase) * 20.0;
-            low_cmd.motor_cmd()[i].kd() = 3.5;
-            low_cmd.motor_cmd()[i].tau() = 0;
-        }
+        low_cmd.motor_cmd()[i].q() = q(i);
+        low_cmd.motor_cmd()[i].dq() = dq(i);
+        low_cmd.motor_cmd()[i].kp() = kp;
+        low_cmd.motor_cmd()[i].kd() = kd;
+        low_cmd.motor_cmd()[i].tau() = tau(i);
     }
-    else
-    {
-        // Then stand down
-        phase = tanh((runing_time - 3.0) / 1.2);
-        for (int i = 0; i < 12; i++)
-        {
-            low_cmd.motor_cmd()[i].q() = phase * stand_down_joint_pos[i] + (1 - phase) * stand_up_joint_pos[i];
-            low_cmd.motor_cmd()[i].dq() = 0;
-            low_cmd.motor_cmd()[i].kp() = 50;
-            low_cmd.motor_cmd()[i].kd() = 3.5;
-            low_cmd.motor_cmd()[i].tau() = 0;
-        }
-    }
-
+    
     low_cmd.crc() = crc32_core((uint32_t *)&low_cmd, (sizeof(unitree_go::msg::dds_::LowCmd_) >> 2) - 1);
     lowcmd_publisher->Write(low_cmd);
+}
+
+void Comm::setCmd(Eigen::VectorXd& Q, Eigen::VectorXd& dQ,Eigen::VectorXd& Tau)
+{
+    this -> q = Q;
+    this -> dq = dQ;
+    this -> tau = Tau;
 }
 

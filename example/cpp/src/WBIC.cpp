@@ -78,7 +78,7 @@ void WBIC::WBIC_setJpre(unsigned int& nt, unsigned int& Dof,std::vector<Eigen::M
     Eigen::MatrixXd Ni;
 
     allJpre.clear();
-    std::cout<<"nt: "<<nt<<std::endl;
+    //std::cout<<"nt: "<<nt<<std::endl;
     for(int i = 0;i<nt-1;i++)
     {
         
@@ -113,12 +113,12 @@ void WBIC::WBIC_getJointCommands(unsigned int& nt, unsigned int& Dof,std::vector
 
     Desired_q_2dot = WBIC_DCpseudoInverse(alljacobian[0],a)*(-alljacobian[0]*Q_dot);
     
-    std::cout<<"joint commands iter start"<<std::endl;
-    std::cout<<"Jpre 1: \n"<<allJpre[0]<<std::endl;
-    std::cout<<"Jpre 2: \n"<<allJpre[1]<<std::endl;
-    std::cout<<"Jaboian 0: \n"<<alljacobian[0]<<std::endl;
-    std::cout<<"Jaboian 1: \n"<<alljacobian[1]<<std::endl;
-    std::cout<<"Jaboian 2: \n"<<alljacobian[2]<<std::endl;
+    //std::cout<<"joint commands iter start"<<std::endl;
+    //std::cout<<"Jpre 1: \n"<<allJpre[0]<<std::endl;
+    //std::cout<<"Jpre 2: \n"<<allJpre[1]<<std::endl;
+    //std::cout<<"Jaboian 0: \n"<<alljacobian[0]<<std::endl;
+    //std::cout<<"Jaboian 1: \n"<<alljacobian[1]<<std::endl;
+    //std::cout<<"Jaboian 2: \n"<<alljacobian[2]<<std::endl;
     for(int i = 0; i<nt-1; i++)
     {
         Delq = Delq + allJpre[i]*(alldel_x[i] - alljacobian[i+1]*Delq);
@@ -146,20 +146,20 @@ void WBIC::WBIC_setCartesianCommands(unsigned int& nt, std::vector<Eigen::Vector
     this-> desired_x_2dot.clear();
 
     
-     std::cout<<"set cartesian commands iter start"<<std::endl;
+     //std::cout<<"set cartesian commands iter start"<<std::endl;
     for(int i = 0;i<nt-1;i++)
     {   
-        std::cout<<"deisred_x: "<<i<<"\n"<<alldesired_x[i].transpose()<<std::endl;
-        std::cout<<"current_x: "<<i<<"\n"<<allx[i].transpose()<<std::endl;
-        std::cout<<"current_x_dot: "<<i<<"\n"<<allx_dot[i].transpose()<<std::endl;
+        //std::cout<<"deisred_x: "<<i<<"\n"<<alldesired_x[i].transpose()<<std::endl;
+        //std::cout<<"current_x: "<<i<<"\n"<<allx[i].transpose()<<std::endl;
+        //std::cout<<"current_x_dot: "<<i<<"\n"<<allx_dot[i].transpose()<<std::endl;
         
         this-> del_x.push_back(alldesired_x[i] - allx[i]);
-        std::cout<<"del_x: "<<i<<"\n"<<del_x[i].transpose()<<std::endl;
-        std::cout<<"deisred_x_dot: "<<i<<"\n"<<alldesired_x_dot[i].transpose()<<std::endl;
-        std::cout<<"deisred_x_2dot: "<<i<<"\n"<<alldesired_x_2dot[i].transpose()<<std::endl;
+        //std::cout<<"del_x: "<<i<<"\n"<<del_x[i].transpose()<<std::endl;
+        //std::cout<<"deisred_x_dot: "<<i<<"\n"<<alldesired_x_dot[i].transpose()<<std::endl;
+        //std::cout<<"deisred_x_2dot: "<<i<<"\n"<<alldesired_x_2dot[i].transpose()<<std::endl;
         
         this-> desired_x_2dot.push_back(alldesired_x_2dot[i] + Kp[i]*(del_x[i]) + Kd[i]*(alldesired_x_dot[i] - allx_dot[i]));
-        std::cout<<i<<std::endl;
+        //std::cout<<i<<std::endl;
     } 
 
     WBIC_setTaskGains(Kp,Kd);   
@@ -239,7 +239,7 @@ void WBIC::WBIC_castWBIC2qpConstraintVector(unsigned int dof, Eigen::VectorXd& F
 
     if(Fr.size()!=0)
     {   
-        std::cout<<"contact detected"<<std::endl;    
+        ////std::cout<<"contact detected"<<std::endl;    
         Eigen::VectorXd MinusInfinity = Eigen::VectorXd::Zero(5*Fr.size()/3);
         Eigen::VectorXd zero = Eigen::VectorXd::Zero(5*Fr.size()/3);
         
@@ -250,7 +250,7 @@ void WBIC::WBIC_castWBIC2qpConstraintVector(unsigned int dof, Eigen::VectorXd& F
         {
             MinusInfinity(i) = -OsqpEigen::INFTY;
         }
-        std::cout<<"set contact constraints"<<std::endl;    
+        ////std::cout<<"set contact constraints"<<std::endl;    
         Eigen::VectorXd model_constraint = -Sf*b-Sf*g; 
 
 
@@ -290,42 +290,42 @@ bool WBIC::WBIC_Init(unsigned int& nt, unsigned int& dof, Eigen::MatrixXd& q1,Ei
     this-> fc = Fc;
     
     WBIC_setModel(a,b,g);
-    std::cout<<"set model"<<std::endl;
+    //std::cout<<"set model"<<std::endl;
     WBIC_setJointStates(Q, Q_dot);
-    std::cout<<"set Joint states"<<std::endl;
+    //std::cout<<"set Joint states"<<std::endl;
     WBIC_setFrictinConstant(Fc);
-    std::cout<<"set fc"<<std::endl;
+    //std::cout<<"set fc"<<std::endl;
     WBIC_setWeightMatrices(q1,q2);
-    std::cout<<"set weight"<<std::endl;
+    //std::cout<<"set weight"<<std::endl;
     WBIC_setJacobianMatrices(alljacobian);
-    std::cout<<"set jacobians"<<std::endl;
+    //std::cout<<"set jacobians"<<std::endl;
     WBIC_setJpre(nt,dof,alljacobian);
-    std::cout<<"set jpre"<<std::endl;
+    //std::cout<<"set jpre"<<std::endl;
     WBIC_getJointCommands(nt, dof, alljacobian, Jpres, del_x, desired_x_dot, desired_x_2dot, a, Q, Q_dot);
-    std::cout<<"get joint commands"<<std::endl;
+    //std::cout<<"get joint commands"<<std::endl;
     
-    std::cout<<"q1: \n"<<q1<<std::endl;
-    std::cout<<"q2: \n"<<q2<<std::endl;
+    //std::cout<<"q1: \n"<<q1<<std::endl;
+    //std::cout<<"q2: \n"<<q2<<std::endl;
     WBIC_castWBIC2qpHessian(dof,q1,q2,Fr);
-    std::cout<<"set hessian"<<std::endl;
-    std::cout<<hessian<<std::endl;
+    //std::cout<<"set hessian"<<std::endl;
+    //std::cout<<hessian<<std::endl;
     
     WBIC_castWBIC2qpGradient(dof,Fr);
-    std::cout<<"set gradient"<<std::endl;
-    std::cout<<gradient<<std::endl;
+    //std::cout<<"set gradient"<<std::endl;
+    //std::cout<<gradient<<std::endl;
     
     WBIC_castWBIC2qpConstraintMatrix(dof, Fr, alljacobian, a, Fc);
-    std::cout<<"set constraint"<<std::endl;
-    std::cout<<linearMatrix<<std::endl;
+    //std::cout<<"set constraint"<<std::endl;
+    //std::cout<<linearMatrix<<std::endl;
     
     WBIC_castWBIC2qpConstraintVector(dof, Fr, desired_q_2dot, b, g);
-    std::cout<<"set constraint vector"<<std::endl;
-    std::cout<<lowerBound<<std::endl;
-    std::cout<<upperBound<<std::endl;
+    //std::cout<<"set constraint vector"<<std::endl;
+    //std::cout<<lowerBound<<std::endl;
+    //std::cout<<upperBound<<std::endl;
     
     solver.settings()->setWarmStart(false);
 
-    std::cout<<" set the initial data of the QP solver"<<std::endl;
+    //std::cout<<" set the initial data of the QP solver"<<std::endl;
     solver.data()->setNumberOfVariables(6 + dof + 2*Fr.size());
     solver.data()->setNumberOfConstraints(6 + dof + 8*Fr.size()/3);
     if (!solver.data()->setHessianMatrix(hessian))
@@ -346,11 +346,11 @@ bool WBIC::WBIC_Init(unsigned int& nt, unsigned int& dof, Eigen::MatrixXd& q1,Ei
     return 0;
 }
 
-Eigen::VectorXd WBIC::WBIC_solve_problem(unsigned int& dof, Eigen::VectorXd& Fr,Eigen::MatrixXd& P,Eigen::MatrixXd& D,OsqpEigen::Solver& solver)
+Eigen::MatrixXd WBIC::WBIC_solve_problem(unsigned int& dof, Eigen::VectorXd& Fr,OsqpEigen::Solver& solver)
 {
     // solve the QP problem
     solver.solveProblem();
-    
+    motor_cmd.resize(dof-6,3);
     // get the controller input
     QPSolution = solver.getSolution();
     ctr.resize(dof + Fr.size());
@@ -359,7 +359,9 @@ Eigen::VectorXd WBIC::WBIC_solve_problem(unsigned int& dof, Eigen::VectorXd& Fr,
     q2dot = ctr.block(0,0,dof,1);
     desired_fr = ctr.block(dof,0,Fr.size(),1);
     tau = A*q2dot + B + G - jacobians[0].transpose()*desired_fr;
-    
-    motor_cmd = P*(desired_q - q) + D*(desired_q_dot - q_dot) + tau.block(6,0,dof-6,1); // this could be chaged : tau.block(6,0,dof-6,1) 
+
+    motor_cmd.block(0,0,dof-6,1) = desired_q.block(6,0,dof-6,1);
+    motor_cmd.block(0,1,dof-6,1) = desired_q_dot.block(6,0,dof-6,1);
+    motor_cmd.block(0,2,dof-6,1) = tau.block(6,0,dof-6,1); 
     return motor_cmd;
 }

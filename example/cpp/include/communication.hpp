@@ -11,7 +11,7 @@
 
 #include <unitree/common/time/time_tool.hpp>
 #include <unitree/common/thread/thread.hpp>
-
+#include <Eigen/Dense>
 
 
 using namespace unitree::common;
@@ -32,11 +32,12 @@ public:
     void Init();
     unitree_go::msg::dds_::LowState_ getLowState();
     unitree_go::msg::dds_::SportModeState_ getHighState();
+    void setCmd(Eigen::VectorXd& Q, Eigen::VectorXd& dQ,Eigen::VectorXd& Tau);
+    
 private:
     void InitLowCmd();
     void LowStateMessageHandler(const void *messages);
     void HighStateMessageHandler(const void *messages);
-    
     void LowCmdWrite();
     
 private:
@@ -60,5 +61,10 @@ private:
 
     /*LowCmd write thread*/
     ThreadPtr lowCmdWriteThreadPtr;
+
+    Eigen::VectorXd q = Eigen::VectorXd::Zero(20);
+    Eigen::VectorXd dq = Eigen::VectorXd::Zero(20);
+    Eigen::VectorXd tau = Eigen::VectorXd::Zero(20);
+    
 };
 

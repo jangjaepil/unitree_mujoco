@@ -8,7 +8,7 @@ public:
     bool WBIC_Init(unsigned int& nt, unsigned int& dof, Eigen::MatrixXd& q1,Eigen::MatrixXd& q2, Eigen::VectorXd& Fr, std::vector<Eigen::MatrixXd>&alljacobian,
                                 Eigen::MatrixXd& a, Eigen::VectorXd& b, Eigen::VectorXd& g,double& Fc, Eigen::VectorXd Q,Eigen::VectorXd Q_dot
                                 ,OsqpEigen::Solver& solver);
-    Eigen::VectorXd WBIC_solve_problem(unsigned int& dof, Eigen::VectorXd& Fr, Eigen::MatrixXd& P,Eigen::MatrixXd& D,OsqpEigen::Solver& solver);
+    Eigen::MatrixXd WBIC_solve_problem(unsigned int& dof, Eigen::VectorXd& Fr,OsqpEigen::Solver& solver);
     void WBIC_setWeightMatrices(Eigen::MatrixXd& Qr,Eigen::MatrixXd& Qi);
     void WBIC_setModel(Eigen::MatrixXd& A,Eigen::VectorXd& b, Eigen::VectorXd& g);
     void WBIC_setJacobianMatrices(std::vector<Eigen::MatrixXd>& alljacobian);

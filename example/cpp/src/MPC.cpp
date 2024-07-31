@@ -8,7 +8,7 @@ void MPC::setDynamicsMatrices(double delT, Eigen::Matrix3d& Rz, Eigen::Matrix3d&
     a.block(9,12,3,3) = (delT/m)*Eigen::MatrixXd::Identity(3,3);
     
     b = Eigen::MatrixXd::Zero(15,3*rSize);
-    //std::cout<<"gI: \n"<<gI<<std::endl;
+    ////std::cout<<"gI: \n"<<gI<<std::endl;
     for(int i = 0;i<rSize;i++)
     {
         Eigen::MatrixXd upR = Eigen::MatrixXd::Zero(3,3);
@@ -17,10 +17,10 @@ void MPC::setDynamicsMatrices(double delT, Eigen::Matrix3d& Rz, Eigen::Matrix3d&
                             rV(2),0,-rV(0),
                             -rV(1),rV(0),0;
         b.block(6,3*i,3,3) = gI.inverse()*upR*delT;
-        //std::cout<<"rV: \n"<<rV.transpose()<<std::endl;
-        //std::cout<<"gI inverse: \n"<<gI.inverse()<<std::endl;
-        //std::cout<<"upR: \n"<<upR<<std::endl;
-        //std::cout<<"delT: \n"<<delT<<std::endl;
+        ////std::cout<<"rV: \n"<<rV.transpose()<<std::endl;
+        ////std::cout<<"gI inverse: \n"<<gI.inverse()<<std::endl;
+        ////std::cout<<"upR: \n"<<upR<<std::endl;
+        ////std::cout<<"delT: \n"<<delT<<std::endl;
         b.block(9,3*i,3,3) = Eigen::MatrixXd::Identity(3,3)*(delT/m);
     }
 
@@ -232,72 +232,72 @@ bool MPC::init(Eigen::VectorXd& x_init,Eigen::VectorXd& x_ref,double delT, Eigen
     mpcWindow = 10;
     int rSize = r.size();
     this -> rSize = r.size();
-     std::cout<<"rSize: "<<rSize<<std::endl;
-     std::cout<<"set the initial and the desired states"<<std::endl;
+     //std::cout<<"rSize: "<<rSize<<std::endl;
+     //std::cout<<"set the initial and the desired states"<<std::endl;
     x0  = x_init;
     xRef = x_ref;
     
 
 
-    std::cout<<"set MPC problem quantities"<<std::endl;
+    //std::cout<<"set MPC problem quantities"<<std::endl;
     setDynamicsMatrices(delT, Rz, gI, r, m, rSize); //delT,Rz,Inertia,r1,r2,m
-    std::cout<<"set dynamics matrices"<<std::endl;
-    // std::cout<<"a: \n"<<a<<std::endl;
-    // std::cout<<"b: \n"<<b<<std::endl;
+    //std::cout<<"set dynamics matrices"<<std::endl;
+    // //std::cout<<"a: \n"<<a<<std::endl;
+    // //std::cout<<"b: \n"<<b<<std::endl;
     
     setInequalityConstraints(xMax, xMin, uMax, uMin,rSize);
-     std::cout<<"set inequality constraints"<<std::endl;
+     //std::cout<<"set inequality constraints"<<std::endl;
     
     setWeightMatrices(Qn, Q, R,rSize);
-    std::cout<<"set weights"<<std::endl;
-    // std::cout<<"Qn: \n"<<Qn<<std::endl;
-    // std::cout<<"Q: \n"<<Q<<std::endl;
-    // std::cout<<"R: \n"<<R<<std::endl;
+    //std::cout<<"set weights"<<std::endl;
+    // //std::cout<<"Qn: \n"<<Qn<<std::endl;
+    // //std::cout<<"Q: \n"<<Q<<std::endl;
+    // //std::cout<<"R: \n"<<R<<std::endl;
     
-    std::cout<<"cast the MPC problem as QP problem"<<std::endl;
+    //std::cout<<"cast the MPC problem as QP problem"<<std::endl;
     castMPCToQPHessian(Qn, Q, R, mpcWindow, rSize, hessian);
-    //std::cout<<"Hessian: \n"<<hessian<<std::endl;
+    ////std::cout<<"Hessian: \n"<<hessian<<std::endl;
  
     
     castMPCToQPGradient(Qn, Q, xRef, mpcWindow, rSize, gradient);
-    //std::cout<<"gradient:\n"<<gradient.transpose()<<std::endl;
+    ////std::cout<<"gradient:\n"<<gradient.transpose()<<std::endl;
  
     castMPCToQPConstraintMatrix(a, b, mpcWindow, rSize, linearMatrix);
-    //std::cout<<"constraint matrix:\n"<<linearMatrix<<std::endl;
+    ////std::cout<<"constraint matrix:\n"<<linearMatrix<<std::endl;
     
     castMPCToQPConstraintVectors(xMax, xMin, uMax, uMin, x0, mpcWindow, rSize, lowerBound, upperBound);
-    // std::cout<<"lower bounds:\n"<<lowerBound.transpose()<<std::endl;
-    // std::cout<<"upper bounds:\n"<<upperBound.transpose()<<std::endl;
+    // //std::cout<<"lower bounds:\n"<<lowerBound.transpose()<<std::endl;
+    // //std::cout<<"upper bounds:\n"<<upperBound.transpose()<<std::endl;
   
    
     solver.settings()->setWarmStart(false);
 
-    std::cout<<" set the initial data of the QP solver"<<std::endl;
+    //std::cout<<" set the initial data of the QP solver"<<std::endl;
     solver.data()->setNumberOfVariables(15 * (mpcWindow + 1) + 3*rSize * mpcWindow);
     solver.data()->setNumberOfConstraints(2 * 15 * (mpcWindow + 1) + 3*rSize * mpcWindow);
     if (!solver.data()->setHessianMatrix(hessian))
-    {   std::cout<<"hessian1"<<std::endl;
+    {   //std::cout<<"hessian1"<<std::endl;
         return 1;
     }
     if (!solver.data()->setGradient(gradient))
-    {   std::cout<<"gradient"<<std::endl;
+    {   //std::cout<<"gradient"<<std::endl;
         return 1;
     }
     if (!solver.data()->setLinearConstraintsMatrix(linearMatrix))
-    {   std::cout<<"linearMatrix"<<std::endl;
+    {   //std::cout<<"linearMatrix"<<std::endl;
         return 1;
     }
     if (!solver.data()->setLowerBound(lowerBound))
-    {   std::cout<<"lowerBound"<<std::endl;
+    {   //std::cout<<"lowerBound"<<std::endl;
         return 1;
     }
     if (!solver.data()->setUpperBound(upperBound))
-    {   std::cout<<"upperBound"<<std::endl;       
+    {   //std::cout<<"upperBound"<<std::endl;       
         return 1;
     }
     // instantiate the solver
     if (!solver.initSolver())
-    {   std::cout<<"init"<<std::endl;
+    {   //std::cout<<"init"<<std::endl;
         return 1;
     }
     
@@ -307,7 +307,7 @@ bool MPC::init(Eigen::VectorXd& x_init,Eigen::VectorXd& x_ref,double delT, Eigen
 bool MPC::solveProblem(OsqpEigen::Solver& solver)
 {
 
-        std::cout<<"xRef: "<<xRef.transpose()<<std::endl;
+        //std::cout<<"xRef: "<<xRef.transpose()<<std::endl;
         
         // solve the QP problem
         if (solver.solveProblem() != OsqpEigen::ErrorExitFlag::NoError)
@@ -328,10 +328,10 @@ bool MPC::updateProblem(double delT, Eigen::Matrix3d& Rz, Eigen::Matrix3d& gI, E
     
             // update the model, gradient, constraint matrix
         setDynamicsMatrices(delT, Rz, gI, r, m, rSize);
-        std::cout<<"Update dynamics"<<std::endl;
+        //std::cout<<"Update dynamics"<<std::endl;
 
         castMPCToQPConstraintMatrix(a, b, mpcWindow, rSize, linearMatrix);
-        std::cout<<"Update constraint matrix"<<std::endl;
+        //std::cout<<"Update constraint matrix"<<std::endl;
 
         setWeightMatrices(Qn, Q, R,rSize);
 
@@ -346,19 +346,19 @@ bool MPC::updateProblem(double delT, Eigen::Matrix3d& Rz, Eigen::Matrix3d& gI, E
 
     
         if (!solver.updateHessianMatrix(hessian))
-        {    std::cout<<"hessian"<<std::endl;
+        {    //std::cout<<"hessian"<<std::endl;
             return 1;
         }
         if (!solver.updateLinearConstraintsMatrix(linearMatrix))
-        {    std::cout<<"linearMatrix"<<std::endl;
+        {    //std::cout<<"linearMatrix"<<std::endl;
             return 1;
         }
         if (!solver.updateBounds(lowerBound,upperBound))
-        {    std::cout<<"Bound"<<std::endl;
+        {    //std::cout<<"Bound"<<std::endl;
             return 1;
         }    
         if (solver.updateGradient(gradient))
-        {    std::cout<<"gradient"<<std::endl;
+        {    //std::cout<<"gradient"<<std::endl;
             return 1;
         }
     //}

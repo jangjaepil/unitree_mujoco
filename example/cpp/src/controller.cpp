@@ -31,8 +31,8 @@ void controller::State2Vector(const unitree_go::msg::dds_::LowState_ low_state, 
     base_vel(1) = high_state.velocity()[1];
     base_vel(2) = high_state.velocity()[2];  
     
-     //pinocchio
-    //Joint ID 2: Name = left_hip_yaw_joint(7)
+    //pinocchio
+    //Joint ID 2: Name = left_hip_yaw_joint(7)  
     //Joint ID 3: Name = left_hip_roll_joint(3)
     //Joint ID 4: Name = left_hip_pitch_joint(4)
     //Joint ID 5: Name = left_knee_joint(5)
@@ -73,6 +73,28 @@ void controller::State2Vector(const unitree_go::msg::dds_::LowState_ low_state, 
     //sensor_index: 17, name: left_shoulder_roll_pos, dim: 1
     //sensor_index: 18, name: left_shoulder_yaw_pos, dim: 1
     //sensor_index: 19, name: left_elbow_pos, dim: 1
+
+    // actuator_index: 0, name: right_hip_roll_joint
+    // actuator_index: 1, name: right_hip_pitch_joint
+    // actuator_index: 2, name: right_knee_joint
+    // actuator_index: 3, name: left_hip_roll_joint
+    // actuator_index: 4, name: left_hip_pitch_joint
+    // actuator_index: 5, name: left_knee_joint
+    // actuator_index: 6, name: torso_joint
+    // actuator_index: 7, name: left_hip_yaw_joint
+    // actuator_index: 8, name: right_hip_yaw_joint
+    // actuator_index: 9, name: not_use_joint
+    // actuator_index: 10, name: left_ankle_joint
+    // actuator_index: 11, name: right_ankle_joint
+    // actuator_index: 12, name: right_shoulder_pitch_joint
+    // actuator_index: 13, name: right_shoulder_roll_joint
+    // actuator_index: 14, name: right_shoulder_yaw_joint
+    // actuator_index: 15, name: right_elbow_joint
+    // actuator_index: 16, name: left_shoulder_pitch_joint
+    // actuator_index: 17, name: left_shoulder_roll_joint
+    // actuator_index: 18, name: left_shoulder_yaw_joint
+    // actuator_index: 19, name: left_elbow_joint
+
 
 
     Eigen::VectorXd base_ang_vel = Eigen::VectorXd::Zero(3);
@@ -249,10 +271,10 @@ void controller::getmodel(pinocchio::Model &model, pinocchio::Data &data)
     Jf.block(3,0,3,dof) = Jlf.block(0,0,3,dof);
     Jc = Jf;
     //Jp = Eigen::MatrixXd::Zero()
-    std::cout<<"JbodyOri: "<<JbodyOri<<std::endl;
-    std::cout<<"Jrf: "<<Jrf<<std::endl;
-    std::cout<<"Jlf: "<<Jlf<<std::endl;
-    std::cout<<"Jf: "<<Jf<<std::endl;
+    //std::cout<<"JbodyOri: "<<JbodyOri<<std::endl;
+    //std::cout<<"Jrf: "<<Jrf<<std::endl;
+    //std::cout<<"Jlf: "<<Jlf<<std::endl;
+    //std::cout<<"Jf: "<<Jf<<std::endl;
     
     alljacobian.clear();
     alljacobian.push_back(Jc);
@@ -296,7 +318,7 @@ void controller::setDesireds()
     Eigen::VectorXd DesiredFootAccs  = Eigen::VectorXd::Zero(6);
     
 
-    DesiredBodyPosition<<0,0,1;
+    DesiredBodyPosition<<0,0,0.7;
     DesiredFootPositions<<0,-0.2,0,0,0.2,0;
     
     x_ref << DesiredBodyOrientation,DesiredBodyPosition,DesiredBodyOriVel,DesiredBodyVel,0,0,-9.8*47;
@@ -327,6 +349,84 @@ void controller::setDesireds()
         kd.push_back(kd_temp);
     }
     
+}
+void controller::convertCmd(Eigen::MatrixXd& Cmds)
+{
+        Eigen::VectorXd q_cmd = Cmds.block(0,0,dof-6,1);
+        Eigen::VectorXd dq_cmd = Cmds.block(0,1,dof-6,1);
+        Eigen::VectorXd tau_cmd = Cmds.block(0,2,dof-6,1);
+
+        
+
+        Eigen::VectorXd Crt_q = Eigen::VectorXd::Zero(20);
+        Eigen::VectorXd Crt_dq = Eigen::VectorXd::Zero(20);
+        Eigen::VectorXd Crt_tau = Eigen::VectorXd::Zero(20);
+        
+        Crt_q(7) = q_cmd(0);
+        Crt_q(3) = q_cmd(1);
+        Crt_q(4) = q_cmd(2);
+        Crt_q(5) = q_cmd(3);
+        Crt_q(10) = q_cmd(4);
+        Crt_q(8) = q_cmd(5);
+        Crt_q(0) = q_cmd(6);
+        Crt_q(1) = q_cmd(7);
+        Crt_q(2) = q_cmd(8);
+        Crt_q(11) = q_cmd(9);
+        Crt_q(6) = q_cmd(10);
+        Crt_q(16) = q_cmd(11);
+        Crt_q(17) = q_cmd(12);
+        Crt_q(18) = q_cmd(13);
+        Crt_q(19) = q_cmd(14);
+        Crt_q(12) = q_cmd(15);
+        Crt_q(13) = q_cmd(16);
+        Crt_q(14) = q_cmd(17);
+        Crt_q(15) = q_cmd(18);
+
+        Crt_dq(7) = dq_cmd(0);
+        Crt_dq(3) = dq_cmd(1);
+        Crt_dq(4) = dq_cmd(2);
+        Crt_dq(5) = dq_cmd(3);
+        Crt_dq(10) = dq_cmd(4);
+        Crt_dq(8) = dq_cmd(5);
+        Crt_dq(0) = dq_cmd(6);
+        Crt_dq(1) = dq_cmd(7);
+        Crt_dq(2) = dq_cmd(8);
+        Crt_dq(11) = dq_cmd(9);
+        Crt_dq(6) = dq_cmd(10);
+        Crt_dq(16) = dq_cmd(11);
+        Crt_dq(17) = dq_cmd(12);
+        Crt_dq(18) = dq_cmd(13);
+        Crt_dq(19) = dq_cmd(14);
+        Crt_dq(12) = dq_cmd(15);
+        Crt_dq(13) = dq_cmd(16);
+        Crt_dq(14) = dq_cmd(17);
+        Crt_dq(15) = dq_cmd(18);
+
+        Crt_tau(7) = tau_cmd(0);
+        Crt_tau(3) = tau_cmd(1);
+        Crt_tau(4) = tau_cmd(2);
+        Crt_tau(5) = tau_cmd(3);
+        Crt_tau(10) = tau_cmd(4);
+        Crt_tau(8) = tau_cmd(5);
+        Crt_tau(0) = tau_cmd(6);
+        Crt_tau(1) = tau_cmd(7);
+        Crt_tau(2) = tau_cmd(8);
+        Crt_tau(11) = tau_cmd(9);
+        Crt_tau(6) = tau_cmd(10);
+        Crt_tau(16) = tau_cmd(11);
+        Crt_tau(17) = tau_cmd(12);
+        Crt_tau(18) = tau_cmd(13);
+        Crt_tau(19) = tau_cmd(14);
+        Crt_tau(12) = tau_cmd(15);
+        Crt_tau(13) = tau_cmd(16);
+        Crt_tau(14) = tau_cmd(17);
+        Crt_tau(15) = tau_cmd(18);
+        std::cout<<"cmds: "<<std::endl;
+        std::cout<<"q: \n"<<Crt_q.transpose()<<std::endl;
+        std::cout<<"dq: \n"<<Crt_dq.transpose()<<std::endl;
+        std::cout<<"tau: \n"<<Crt_tau.transpose()<<std::endl;
+        setCmd(Crt_q,Crt_dq,Crt_tau);
+        
 }
 
 void controller::run()
@@ -364,7 +464,7 @@ void controller::run()
     double delT = 0.04;
     double m = 47;
     double Fc = 1;
-    Eigen::Matrix3d bI = 80*Eigen::MatrixXd::Identity(3,3);
+    Eigen::Matrix3d bI = 40*Eigen::MatrixXd::Identity(3,3);
  
     MPC mpc;
     WBIC wbic;
@@ -381,7 +481,7 @@ void controller::run()
         OsqpEigen::Solver qp;
         mpc.init(mpc_states,x_ref,delT,Rz,gI,r,m,qp); 
         mpc.solveProblem(qp);
-        Eigen::VectorXd Fr = mpc.getCtr();
+        Eigen::VectorXd Fr = -1*mpc.getCtr();
         std::cout<<"Fr: "<<Fr.transpose()<<std::endl;
         qp.clearSolver();
 
@@ -395,10 +495,11 @@ void controller::run()
         wbic.WBIC_setCartesianCommands(nt,alldesired_x, alldesired_x_dot, alldesired_x_2dot, allx, allx_dot, kp, kd);
         wbic.WBIC_Init(nt, dof,  q1, q2, Fr, alljacobian, a, b, g, Fc, q, dq ,QP);
         
-        Eigen::MatrixXd  P  = Eigen::MatrixXd::Identity(dof - 6,dof - 6);
-        Eigen::MatrixXd  D  = Eigen::MatrixXd::Identity(dof - 6,dof - 6);
-        Eigen::VectorXd tau_cmd = wbic.WBIC_solve_problem(dof, Fr, P, D, QP);
-        std::cout<<"tau_cmd: "<<tau_cmd.transpose()<<std::endl;
+        Eigen::MatrixXd cmd = wbic.WBIC_solve_problem(dof, Fr,QP);
+        convertCmd(cmd);
+        
+        
+
         QP.clearSolver();
         
        //transfer the tau_cmds to the real robot using communcation
