@@ -330,6 +330,55 @@ Stephen Brawner (brawner@gmail.com)
       effort="40"
       velocity="9" />
   </joint>
+
+  <link name = "left_front_dummy_link">
+  <inertial>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <mass
+        value="0" />
+      <inertia
+        ixx="0"
+        ixy="0"
+        ixz="0"
+        iyy="0"
+        iyz="0"
+        izz="0" />
+    </inertial>
+  </link>
+
+  <joint
+    name="left_front_joint"
+    type="fixed">
+    <origin
+      xyz="0.2 0 -0.06"
+      rpy="0 0 0" />
+    <parent
+      link="left_ankle_link" />
+    <child
+      link="left_front_dummy_link" />
+    <axis
+      xyz="0 1 0" />
+  </joint>
+  
+  <link name = "left_rear_dummy_link">
+  </link>
+
+  <joint
+    name="left_rear_joint"
+    type="fixed">
+    <origin
+      xyz="-0.1 0 -0.06"
+      rpy="0 0 0" />
+    <parent
+      link="left_ankle_link" />
+    <child
+      link="left_rear_dummy_link" />
+    <axis
+      xyz="0 1 0" />
+  </joint>
+
   <link
     name="right_hip_yaw_link">
     <inertial>
@@ -605,6 +654,41 @@ Stephen Brawner (brawner@gmail.com)
       effort="40"
       velocity="9" />
   </joint>
+  
+  <link name = "right_front_dummy_link">
+  </link>
+
+  <joint
+    name="right_front_joint"
+    type="fixed">
+    <origin
+      xyz="0.2 0 -0.06"
+      rpy="0 0 0" />
+    <parent
+      link="right_ankle_link" />
+    <child
+      link="right_front_dummy_link" />
+    <axis
+      xyz="0 1 0" />
+  </joint>
+  
+  <link name = "right_rear_dummy_link">
+  </link>
+
+  <joint
+    name="right_rear_joint"
+    type="fixed">
+    <origin
+      xyz="-0.1 0 -0.06"
+      rpy="0 0 0" />
+    <parent
+      link="right_ankle_link" />
+    <child
+      link="right_rear_dummy_link" />
+    <axis
+      xyz="0 1 0" />
+  </joint>
+
   <link
     name="torso_link">
     <inertial>

@@ -29,6 +29,7 @@
 #include "mujoco/simulate.h"
 #include "mujoco/array_safety.h"
 #include "unitree_sdk2_bridge/unitree_sdk2_bridge.h"
+#include "controller.hpp"
 #include <pthread.h>
 #include "yaml-cpp/yaml.h"
 
@@ -337,7 +338,7 @@ namespace
           m = mnew;
           d = dnew;
           mj_forward(m, d);
-
+         
           // allocate ctrlnoise
           free(ctrlnoise);
           ctrlnoise = (mjtNum *)malloc(sizeof(mjtNum) * m->nu);
@@ -591,6 +592,23 @@ void *UnitreeSdk2BridgeThread(void *arg)
 
   pthread_exit(NULL);
 }
+
+void *ControllerThread(void *arg)
+{
+  while (1)
+  {
+    if (d)
+    {
+      std::cout << "Mujoco data is prepared" << std::endl;
+      break;
+    }
+    usleep(500000);
+  }
+  controller controller(m, d);
+  controller.run();
+  pthread_exit(NULL);
+}
+
 //------------------------------------------ main --------------------------------------------------
 
 // machinery for replacing command line error by a macOS dialog box when running under Rosetta
@@ -602,6 +620,9 @@ __attribute__((used, visibility("default"))) extern "C" void _mj_rosettaError(co
   rosetta_error_msg = msg;
 }
 #endif
+
+
+
 
 // run event loop
 int main(int argc, char **argv)
@@ -667,14 +688,22 @@ int main(int argc, char **argv)
     filename = scene_path.c_str();
   }
 
-  pthread_t unitree_thread;
-  int rc = pthread_create(&unitree_thread, NULL, UnitreeSdk2BridgeThread, NULL);
-  if (rc != 0)
+  // pthread_t unitree_thread;
+  // int rc = pthread_create(&unitree_thread, NULL, UnitreeSdk2BridgeThread, NULL);
+  // if (rc != 0)
+  // {
+  //   std::cout << "Error:unable to create unitree thread," << rc << std::endl;
+  //   exit(-1);
+  // }
+  
+  pthread_t controller_thread;
+  int cc = pthread_create(&controller_thread, NULL, ControllerThread, NULL);
+  if (cc != 0)
   {
-    std::cout << "Error:unable to create thread," << rc << std::endl;
+    std::cout << "Error:unable to create controller thread," << cc << std::endl;
     exit(-1);
   }
-
+  
   // start physics thread
   std::thread physicsthreadhandle(&PhysicsThread, sim.get(), filename);
   // start simulation UI loop (blocking call)

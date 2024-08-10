@@ -57,7 +57,7 @@ void Comm::InitLowCmd()
     low_cmd.level_flag() = 0xFF;
     low_cmd.gpio() = 0;
 
-    for (int i = 0; i < 20; i++)
+    for (int i = 0; i < 12; i++)
     {
         low_cmd.motor_cmd()[i].mode() = (0x01); // motor switch to servo (PMSM) mode
         low_cmd.motor_cmd()[i].q() = (PosStopF);
@@ -93,11 +93,11 @@ unitree_go::msg::dds_::SportModeState_ Comm::getHighState()
 
 void Comm::LowCmdWrite()
 {   
-    double kp = 1;
+    double kp = 0.5;
     double kd = 0.1;
-    
-    for (int i = 0; i < 20; i++)
+    for (int i = 0; i < 12; i++)
     {
+        
         low_cmd.motor_cmd()[i].q() = q(i);
         low_cmd.motor_cmd()[i].dq() = dq(i);
         low_cmd.motor_cmd()[i].kp() = kp;

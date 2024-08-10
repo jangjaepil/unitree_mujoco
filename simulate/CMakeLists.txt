@@ -6,13 +6,20 @@ enable_language(CXX)
 set(CMAKE_CXX_STANDARD 17)
 
 find_package(mujoco REQUIRED)
-include_directories(/usr/local/include/ddscxx /usr/local/include/iceoryx/v2.0.2)
-link_libraries(unitree_sdk2 ddsc ddscxx rt pthread)
+find_package(OsqpEigen REQUIRED)
+find_package(Eigen3)
+
+include_directories(/usr/local/include/ddscxx 
+                    /usr/local/include/iceoryx/v2.0.2 
+                    ${EIGEN3_INCLUDE_DIR}
+                    /home/jang/unitree_mujoco/simulate/src/controller)
+link_libraries(unitree_sdk2 ddsc ddscxx rt pthread OsqpEigen::OsqpEigen)
 
 FILE (GLOB SIM_SRC
         src/joystick/joystick.cc
         src/mujoco/*.cc
-        src/unitree_sdk2_bridge/*.cc)
+        src/unitree_sdk2_bridge/*.cc
+        src/controller/*.cpp)
 
 set(SIM_DEPENDENCIES 
     pthread

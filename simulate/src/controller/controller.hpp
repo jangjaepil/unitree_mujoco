@@ -1,25 +1,35 @@
-#include <communication.hpp>
+
 #include <MPC.hpp>
 #include <WBIC.hpp>
 #include <Requiredheaders.hpp>
-
-class controller : public Comm,public MPC,public WBIC{
+#include <mujoco/mujoco.h>
+#define MOTOR_SENSOR_NUM 3
+class controller
+{
     public:
-            controller();
+            controller(mjModel *model, mjData *data);
             void run();
-            void State2Vector(const unitree_go::msg::dds_::LowState_ low_state, const unitree_go::msg::dds_::SportModeState_ high_state);
+            void State2Vector();
             void convertCmd(std::vector<Eigen::VectorXd>& Cmds);
-            void getmodel(pinocchio::Model &model, pinocchio::Data &data);
+            void getmodel();
             void setJacobian();
             void setDesireds();
     private:
         
         
         
+        mjData *mj_data_;
+        mjModel *mj_model_;
+        int num_motor_ = 0;
+        int dim_motor_sensor_ = 0;
+        int have_imu_ = false;
+        int have_frame_sensor_ = false;
+        
+        
         
         unsigned int dof = 0; //number of joints + 6
         int number_of_joints = 0;
-        bool sensor_flag = 0;
+       
         Eigen::VectorXd q;
         Eigen::VectorXd q_wbic;
         Eigen::VectorXd dq;
@@ -34,11 +44,13 @@ class controller : public Comm,public MPC,public WBIC{
         Eigen::VectorXd mpc_states = Eigen::VectorXd::Zero(15);
         Eigen::Matrix3d Rz = Eigen::MatrixXd::Identity(3,3);
         Eigen::MatrixXd a;
+        Eigen::MatrixXd past_a;
         Eigen::VectorXd b;
         Eigen::VectorXd g;
         Eigen::VectorXd x_ref = Eigen::VectorXd::Zero(15);
 
-        Eigen::MatrixXd jacobian;
+        Eigen::MatrixXd jacobian_pos;
+        Eigen::MatrixXd jacobian_rot;
         Eigen::MatrixXd Jc;
         Eigen::MatrixXd Jcom;
         Eigen::MatrixXd Jbody;
@@ -61,6 +73,15 @@ class controller : public Comm,public MPC,public WBIC{
         std::vector<Eigen::VectorXd> allx;
         std::vector<Eigen::VectorXd> allx_dot;
         Eigen::Matrix3d wRb;
+        
+        //contact positions for mpc
+        Eigen::VectorXd rl  = Eigen::VectorXd::Zero(3);
+        Eigen::VectorXd rr  = Eigen::VectorXd::Zero(3);
+        Eigen::VectorXd fl  = Eigen::VectorXd::Zero(3);
+        Eigen::VectorXd fr  = Eigen::VectorXd::Zero(3);
+        Eigen::VectorXd base = Eigen::VectorXd::Zero(3);
+        Eigen::VectorXd frame_position = Eigen::VectorXd::Zero(3);
+        
         double m;
         double Total_mass = 0;
         Eigen::VectorXd MassPosition = Eigen::VectorXd::Zero(3);

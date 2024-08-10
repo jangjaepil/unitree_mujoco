@@ -68,6 +68,9 @@ void UnitreeSdk2Bridge::PublishLowState()
         }
 
         low_state_puber_->Write(low_state);
+        
+
+       
     }
 }
 
@@ -124,6 +127,7 @@ void UnitreeSdk2Bridge::Run()
 {
     while (1)
     {
+        
         sleep(2);
     }
 }
