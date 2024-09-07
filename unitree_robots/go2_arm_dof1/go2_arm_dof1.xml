@@ -377,6 +377,7 @@
     <jointpos name="z1_Link04_pos" joint="joint4" />
     <jointpos name="z1_Link05_pos" joint="joint5" />
     <jointpos name="z1_Link06_pos" joint="joint6" />
+    <jointpos name="universal_pos" joint="universal_joint_x" />
 
 
     <jointvel name="FR_hip_vel" joint="FR_hip_joint" />
@@ -398,6 +399,7 @@
     <jointvel name="z1_linkt04_vel" joint="joint4" />
     <jointvel name="z1_linkt05_vel" joint="joint5" />
     <jointvel name="z1_linkt06_vel" joint="joint6" />
+    <jointvel name="universal_vel" joint="universal_joint_x"/>
 
 
 
@@ -421,7 +423,7 @@
     <jointactuatorfrc name="z1_Link04_torque" joint="joint4" noise="0.01" />
     <jointactuatorfrc name="z1_Link05_torque" joint="joint5" noise="0.01" />
     <jointactuatorfrc name="z1_Link06_torque" joint="joint6" noise="0.01" />
-
+     <jointactuatorfrc name="universal_torque" joint="universal_joint_x" noise="0.01"/>
 
     <framequat name="imu_quat" objtype="site" objname="imu" />
     <gyro name="imu_gyro" site="imu" />

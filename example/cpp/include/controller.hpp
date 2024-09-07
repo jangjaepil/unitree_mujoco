@@ -31,6 +31,7 @@ class controller : public Comm,public MPC,public WBIC{
         Eigen::VectorXd oriVel = Eigen::VectorXd::Zero(3);
         Eigen::VectorXd base_pos = Eigen::VectorXd::Zero(3); 
         Eigen::VectorXd base_vel = Eigen::VectorXd::Zero(3); 
+        
         Eigen::VectorXd mpc_states = Eigen::VectorXd::Zero(15);
         Eigen::Matrix3d Rz = Eigen::MatrixXd::Identity(3,3);
         Eigen::MatrixXd a;
@@ -49,6 +50,8 @@ class controller : public Comm,public MPC,public WBIC{
         Eigen::MatrixXd Jfl;
         Eigen::MatrixXd Jfr;
         Eigen::MatrixXd Jf;
+       
+                
         //TASK gains
         std::vector<Eigen::MatrixXd> kp;
         std::vector<Eigen::MatrixXd> kd;

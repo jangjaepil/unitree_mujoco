@@ -49,6 +49,11 @@ class controller
         Eigen::VectorXd g;
         Eigen::VectorXd x_ref = Eigen::VectorXd::Zero(15);
 
+
+        Eigen::VectorXd ee_OriVel = Eigen::VectorXd::Zero(3);
+        Eigen::VectorXd ee_pos = Eigen::VectorXd::Zero(3); 
+        Eigen::VectorXd ee_vel = Eigen::VectorXd::Zero(3); 
+
         Eigen::MatrixXd jacobian_pos;
         Eigen::MatrixXd jacobian_rot;
         Eigen::MatrixXd Jc;
@@ -61,6 +66,9 @@ class controller
         Eigen::MatrixXd Jfl;
         Eigen::MatrixXd Jfr;
         Eigen::MatrixXd Jf;
+         Eigen::MatrixXd Jee;
+        Eigen::MatrixXd JeeOri; 
+        
         //TASK gains
         std::vector<Eigen::MatrixXd> kp;
         std::vector<Eigen::MatrixXd> kd;
@@ -73,7 +81,7 @@ class controller
         std::vector<Eigen::VectorXd> allx;
         std::vector<Eigen::VectorXd> allx_dot;
         Eigen::Matrix3d wRb;
-        
+        Eigen::Matrix3d wRe;
         //contact positions for mpc
         Eigen::VectorXd rl  = Eigen::VectorXd::Zero(3);
         Eigen::VectorXd rr  = Eigen::VectorXd::Zero(3);

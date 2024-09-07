@@ -687,6 +687,7 @@ int main(int argc, char **argv)
   {
     filename = scene_path.c_str();
   }
+  
 
   // pthread_t unitree_thread;
   // int rc = pthread_create(&unitree_thread, NULL, UnitreeSdk2BridgeThread, NULL);
@@ -704,10 +705,11 @@ int main(int argc, char **argv)
     exit(-1);
   }
   
-  // start physics thread
+    // start physics thread
   std::thread physicsthreadhandle(&PhysicsThread, sim.get(), filename);
   // start simulation UI loop (blocking call)
   sim->RenderLoop();
+  
   physicsthreadhandle.join();
 
   pthread_exit(NULL);

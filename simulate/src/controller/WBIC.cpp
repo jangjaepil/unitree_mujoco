@@ -167,19 +167,19 @@ void WBIC::WBIC_setCartesianCommands(unsigned int& nt, std::vector<Eigen::Vector
      //////std::cout<<"set cartesian commands iter start"<<std::endl;
     for(int i = 0;i<nt-1;i++)
     {   
-        std::cout<<"deisred_x: "<<i<<"\n"<<alldesired_x[i].transpose()<<std::endl;
-        std::cout<<"current_x: "<<i<<"\n"<<allx[i].transpose()<<std::endl;
-        std::cout<<"current_x_dot: "<<i<<"\n"<<allx_dot[i].transpose()<<std::endl;
+        //std::cout<<"deisred_x: "<<i<<"\n"<<alldesired_x[i].transpose()<<std::endl;
+        //std::cout<<"current_x: "<<i<<"\n"<<allx[i].transpose()<<std::endl;
+        //std::cout<<"current_x_dot: "<<i<<"\n"<<allx_dot[i].transpose()<<std::endl;
         
         this-> del_x.push_back(alldesired_x[i] - allx[i]);
-        std::cout<<"del_x: "<<i<<"\n"<<del_x[i].transpose()<<std::endl;
-        std::cout<<"deisred_x_dot: "<<i<<"\n"<<alldesired_x_dot[i].transpose()<<std::endl;
-        std::cout<<"alldeisred_x_2dot: "<<i<<"\n"<<alldesired_x_2dot[i].transpose()<<std::endl;
+        //std::cout<<"del_x: "<<i<<"\n"<<del_x[i].transpose()<<std::endl;
+        //std::cout<<"deisred_x_dot: "<<i<<"\n"<<alldesired_x_dot[i].transpose()<<std::endl;
+        //std::cout<<"alldeisred_x_2dot: "<<i<<"\n"<<alldesired_x_2dot[i].transpose()<<std::endl;
         
         this-> desired_x_2dot.push_back(alldesired_x_2dot[i] + Kp[i]*(del_x[i]) + Kd[i]*(alldesired_x_dot[i] - allx_dot[i]));
-        std::cout<<"deisred_x_2dot: "<<i<<"\n"<<desired_x_2dot[i].transpose()<<std::endl;
+        //std::cout<<"deisred_x_2dot: "<<i<<"\n"<<desired_x_2dot[i].transpose()<<std::endl;
         
-        std::cout<<i<<std::endl;
+        //std::cout<<i<<std::endl;
     } 
 
     WBIC_setTaskGains(Kp,Kd);   
@@ -381,9 +381,9 @@ void WBIC::WBIC_solve_problem(unsigned int& dof, Eigen::VectorXd& Fr,OsqpEigen::
     
     q2dot = ctr.block(0,0,dof,1);
     desired_fr = ctr.block(dof,0,Fr.size(),1);
-    std::cout<<"desired fr: \n"<<desired_fr.transpose()<<std::endl;
-    std::cout<<" q2dot: \n"<<q2dot.transpose()<<std::endl;
-    std::cout<<" a: \n"<<A<<std::endl;
+    //std::cout<<"desired fr: \n"<<desired_fr.transpose()<<std::endl;
+    //std::cout<<" q2dot: \n"<<q2dot.transpose()<<std::endl;
+    //std::cout<<" a: \n"<<A<<std::endl;
     //std::cout<<" B: \n"<<B.transpose()<<std::endl;
     
     tau = A*q2dot + B + G - jacobians[0].transpose()*desired_fr;
