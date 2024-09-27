@@ -1,6 +1,10 @@
 #include <controller.hpp>
 #include <thread>
+#include <pybind11/pybind11.h>
+#include <pybind11/embed.h>  // Everything needed to embed Python
+#include <pybind11/numpy.h>
 
+namespace py = pybind11;
 controller::controller(mjModel *model, mjData *data) : mj_model_(model), mj_data_(data)
 {
    
@@ -257,7 +261,7 @@ void controller::getmodel()
                
                 wRe = Eigen::Map<const Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(rmatrix);
 
-                 std::cout<<"wRe: \n"<<wRe<<std::endl;
+                 //std::cout<<"wRe: \n"<<wRe<<std::endl;
             
                }
 
@@ -287,7 +291,7 @@ void controller::getmodel()
         mj_jacBodyCom(mj_model_, mj_data_, jacp, NULL, i);
         J_pos = Eigen::Map<Eigen::Matrix<double, 3, Eigen::Dynamic,Eigen::RowMajor>>(jacp, 3, nv);
         
-        std::cout<<"jpos for com: \n"<<J_pos<<std::endl;
+        //std::cout<<"jpos for com: \n"<<J_pos<<std::endl;
         Jcom += mass * J_pos;
         
         total_mass += mass;
@@ -297,8 +301,8 @@ void controller::getmodel()
     Jcom /= total_mass;
     
     Eigen::VectorXd comVel = Jcom*dq;
-    std::cout<<"Jcom: \n"<<Jcom<<std::endl; 
-    std::cout<<"com: \n"<<com<<std::endl; 
+    //std::cout<<"Jcom: \n"<<Jcom<<std::endl; 
+    //std::cout<<"com: \n"<<com<<std::endl; 
     
     ////std::cout<<"JbodyOri: \n"<<JbodyOri<<std::endl;
     ////std::cout<<"Jbody: \n"<<Jbody<<std::endl;
@@ -576,7 +580,13 @@ void controller::run()
     double Fc = 0.01;
     
     Eigen::Matrix3d bI = 40*Eigen::MatrixXd::Identity(3,3);
+   
+    py::scoped_interpreter guard{};
+    py::module_ sys = py::module_::import("sys");
+    sys.attr("path").attr("append")("/home/jang/unitree_mujoco/simulate/src/RL/");
     
+    py::module_ rl_module = py::module_::import("Policy"); 
+
     MPC mpc;
     WBIC wbic;
   
@@ -605,7 +615,27 @@ void controller::run()
 
 
             OsqpEigen::Solver QP;
+        
+            std::vector<double> state = {0, 0, -0.4, 0.9};  // Example state
+            std::cout<<"state done"<<std::endl;
+            py::array_t<double> state_array(state.size(), state.data());
 
+            // Call the Python function to get the control action
+            py::object action = rl_module.attr("get_action")(state_array);
+            
+            
+            // Convert the result back to C++ (vector of doubles)
+            py::array_t<double> action_array = action.cast<py::array_t<double>>();
+            py::buffer_info buf = action_array.request();
+
+            double *ptr = static_cast<double *>(buf.ptr);
+            size_t size = buf.size;
+            
+            // Convert NumPy array to std::vector<double>
+            Eigen::Map<Eigen::VectorXd> eigen_action(ptr, size);
+
+            // Print the action (or apply it to your MuJoCo controller)
+            std::cout<<"control action: "<< eigen_action<<std::endl; 
             wbic.WBIC_setCartesianCommands(nt,alldesired_x, alldesired_x_dot, alldesired_x_2dot, allx, allx_dot, kp, kd);
             //std::cout<<"before wb init a: \n"<<a<<std::endl;
             wbic.WBIC_Init(nt, dof,  q1, q2, Fr, alljacobian, a, b, g, Fc, q_wbic, dq ,QP);
