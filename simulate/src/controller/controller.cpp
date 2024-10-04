@@ -1,8 +1,6 @@
 #include <controller.hpp>
 #include <thread>
-#include <pybind11/pybind11.h>
-#include <pybind11/embed.h>  // Everything needed to embed Python
-#include <pybind11/numpy.h>
+
 
 namespace py = pybind11;
 controller::controller(mjModel *model, mjData *data) : mj_model_(model), mj_data_(data)
@@ -366,6 +364,28 @@ void controller::getmodel()
     
    } 
 }
+void controller::Policy(py::module_& rl_module)
+{
+    std::vector<double> state = {ee_pos[1], ee_vel[1], q(13), dq(13), 0};  
+    std::cout<<"state done"<<std::endl;
+    py::array_t<double> state_array(state.size(), state.data());
+    // Call the Python function to get the control action
+    py::object action = rl_module.attr("get_action")(state_array);
+    
+    
+    // Convert the result back to C++ (vector of doubles)
+    py::array_t<double> action_array = action.cast<py::array_t<double>>();
+    py::buffer_info buf = action_array.request();
+    double *ptr = static_cast<double *>(buf.ptr);
+    size_t size = buf.size;
+    
+    // Convert NumPy array to std::vector<double>
+    Eigen::Map<Eigen::VectorXd> eigen_action(ptr, size);
+    // Print the action (or apply it to your MuJoCo controller)
+    std::cout<<"control action: "<< eigen_action<<std::endl; 
+    y_position = eigen_action[0]; //pos,vel,theta,theta dot
+    y_vel = eigen_action[1];
+}
 void controller::setDesireds()
 {
     Eigen::VectorXd DesiredBodyOrientation  = Eigen::VectorXd::Zero(3);
@@ -392,8 +412,10 @@ void controller::setDesireds()
     
     double current_time = mj_data_-> time;
     double duration = 3;
-    double y_position = 0.25*sin(3*3.14*current_time);
+    // double y_position = 0.25*sin(3*3.14*current_time);
     DesiredEEPosition << 0.1,y_position,0.65;
+    DesiredEEVel << 0, y_vel,0;
+    
     x_ref << DesiredBodyOrientation,DesiredBodyPosition,DesiredBodyOriVel,DesiredBodyVel,0,0,-9.81*m;
     
 
@@ -574,19 +596,18 @@ void controller::run()
     }
     
     //std::cout << "Total mass of the robot: " << m << " kg" << std::endl;
-   
+    py::scoped_interpreter guard{};
+    py::module_ sys = py::module_::import("sys");
+    sys.attr("path").attr("append")("/home/jang/unitree_mujoco/simulate/src/RL/");
+    py::module_ rl_module = py::module_::import("Policy"); 
 
+    
+    
     double delT = 0.04;
     double Fc = 0.01;
     
     Eigen::Matrix3d bI = 40*Eigen::MatrixXd::Identity(3,3);
    
-    py::scoped_interpreter guard{};
-    py::module_ sys = py::module_::import("sys");
-    sys.attr("path").attr("append")("/home/jang/unitree_mujoco/simulate/src/RL/");
-    
-    py::module_ rl_module = py::module_::import("Policy"); 
-
     MPC mpc;
     WBIC wbic;
   
@@ -601,6 +622,7 @@ void controller::run()
        
             Eigen::Matrix3d gI = Rz*bI*Rz.transpose();
             getmodel();
+            Policy(rl_module);
             setDesireds();
             OsqpEigen::Solver qp;
             mpc.init(mpc_states,x_ref,delT,Rz,gI,r,m,Fc,qp); 
@@ -616,26 +638,7 @@ void controller::run()
 
             OsqpEigen::Solver QP;
         
-            std::vector<double> state = {0, 0, -0.4, 0.9};  // Example state
-            std::cout<<"state done"<<std::endl;
-            py::array_t<double> state_array(state.size(), state.data());
-
-            // Call the Python function to get the control action
-            py::object action = rl_module.attr("get_action")(state_array);
             
-            
-            // Convert the result back to C++ (vector of doubles)
-            py::array_t<double> action_array = action.cast<py::array_t<double>>();
-            py::buffer_info buf = action_array.request();
-
-            double *ptr = static_cast<double *>(buf.ptr);
-            size_t size = buf.size;
-            
-            // Convert NumPy array to std::vector<double>
-            Eigen::Map<Eigen::VectorXd> eigen_action(ptr, size);
-
-            // Print the action (or apply it to your MuJoCo controller)
-            std::cout<<"control action: "<< eigen_action<<std::endl; 
             wbic.WBIC_setCartesianCommands(nt,alldesired_x, alldesired_x_dot, alldesired_x_2dot, allx, allx_dot, kp, kd);
             //std::cout<<"before wb init a: \n"<<a<<std::endl;
             wbic.WBIC_Init(nt, dof,  q1, q2, Fr, alljacobian, a, b, g, Fc, q_wbic, dq ,QP);

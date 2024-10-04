@@ -3,6 +3,11 @@
 #include <WBIC.hpp>
 #include <Requiredheaders.hpp>
 #include <mujoco/mujoco.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/embed.h>  // Everything needed to embed Python
+#include <pybind11/numpy.h>
+namespace py = pybind11;
+
 #define MOTOR_SENSOR_NUM 3
 class controller
 {
@@ -14,6 +19,7 @@ class controller
             void getmodel();
             void setJacobian();
             void setDesireds();
+            void Policy(py::module_& rl_module);
     private:
         
         
@@ -25,8 +31,8 @@ class controller
         int have_imu_ = false;
         int have_frame_sensor_ = false;
         
-        
-        
+        double y_position;
+        double y_vel;
         unsigned int dof = 0; //number of joints + 6
         int number_of_joints = 0;
        

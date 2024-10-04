@@ -1,12 +1,12 @@
 import gymnasium as gym
 import numpy as np
-from stable_baselines3 import PPO
+from stable_baselines3 import SAC
 from stable_baselines3.common.env_util import make_vec_env
 import warnings
 warnings.filterwarnings("ignore")
 
 vec_env = make_vec_env("CartPole-v1", n_envs=1)
-model = PPO.load("/home/jang/unitree_mujoco/simulate/src/RL/ppo_cartpole")
+model = SAC.load("/home/jang/unitree_mujoco/simulate/src/RL/policies/ppo_cartpole")
 
 fake_obs = vec_env.reset()
 print("fake_obs type: ",type(fake_obs))
