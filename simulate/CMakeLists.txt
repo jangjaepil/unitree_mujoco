@@ -9,12 +9,16 @@ find_package(mujoco REQUIRED)
 find_package(OsqpEigen REQUIRED)
 find_package(Eigen3)
 find_package(pybind11 REQUIRED)
-find_package(Python3 REQUIRED COMPONENTS Development)
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development REQUIRED)
+
 
 include_directories(/usr/local/include/ddscxx 
                     /usr/local/include/iceoryx/v2.0.2 
                     ${EIGEN3_INCLUDE_DIR}
-                    /home/jang/unitree_mujoco/simulate/src/controller)
+                    /home/jang/unitree_mujoco/simulate/src/controller
+                    /home/jang/unitree_mujoco/simulate/src/matplotlib-cpp
+                    ${Python3_INCLUDE_DIRS})
+
 link_libraries(unitree_sdk2 ddsc ddscxx rt pthread OsqpEigen::OsqpEigen)
 
 FILE (GLOB SIM_SRC
@@ -31,7 +35,7 @@ set(SIM_DEPENDENCIES
 
 
 add_executable(unitree_mujoco ${SIM_SRC} src/main.cc)
-target_link_libraries(unitree_mujoco PRIVATE ${SIM_DEPENDENCIES} pybind11::embed Python3::Python)
+target_link_libraries(unitree_mujoco PRIVATE ${SIM_DEPENDENCIES} pybind11::embed Python3::Python ${Python3_INCLUDE_LIBRARIES})
 
 add_executable(test test/test_unitree_sdk2.cpp)
 add_executable(jstest src/joystick/jstest.cc src/joystick/joystick.cc)

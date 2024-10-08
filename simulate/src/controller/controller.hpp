@@ -31,7 +31,7 @@ class controller
         int have_imu_ = false;
         int have_frame_sensor_ = false;
         
-        double y_position;
+        double y_position = 0;
         double y_vel;
         unsigned int dof = 0; //number of joints + 6
         int number_of_joints = 0;

@@ -178,7 +178,7 @@
                                     <body name="universal_link" pos="0.073 0 0">
                                       <inertial pos="0 0 0.1" mass="0.25" diaginertia="0.005 0.005 0.005" />
                                       <!-- universal_joint_x: Passive joint with no limits -->
-                                      <joint name="universal_joint_x" pos="0 0 0" axis="1 0 0" damping="0" frictionloss="0" />
+                                      <joint name="universal_joint_x" pos="0 0 0" axis="1 0 0" damping="0" frictionloss="0"/>
                                       <geom size="0.02 0.1" pos="0 0 0.1" type="cylinder" rgba="0.671705 0.692426 0.774270 1" class="visual"/>
                                   </body>
                                 </body>

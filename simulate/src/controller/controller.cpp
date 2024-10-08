@@ -1,7 +1,8 @@
 #include <controller.hpp>
+#include "matplotlibcpp.h"
 #include <thread>
 
-
+namespace plt = matplotlibcpp;
 namespace py = pybind11;
 controller::controller(mjModel *model, mjData *data) : mj_model_(model), mj_data_(data)
 {
@@ -142,10 +143,9 @@ void controller::State2Vector()
                         0, 0, 0, 1;
 
     Rz = Eigen::Matrix3d::Identity(3,3);
-    mpc_states<< euler_angle,base_pos, oriVel, base_vel,0,0,-9.81*m;//euler angle,position,angular velocity, linear velocity, gravity
     
         
-    std::cout<<"q: \n"<<q.transpose()<<std::endl;
+    //std::cout<<"q: \n"<<q.transpose()<<std::endl;
     //std::cout<<"dq: \n"<<dq.transpose()<<std::endl;
     //std::cout<<"tau: \n"<<tau.transpose()<<std::endl;
     //std::cout<<"imu_quat: \n"<<imu_quat.x()<<"\n"<< imu_quat.y()<<"\n"<<imu_quat.z()<<"\n"<<imu_quat.w()<<std::endl;
@@ -299,6 +299,9 @@ void controller::getmodel()
     Jcom /= total_mass;
     
     Eigen::VectorXd comVel = Jcom*dq;
+    //base_pos,base_vel
+    mpc_states<< euler_angle,com, oriVel, comVel,0,0,-9.81*m;//euler angle,position,angular velocity, linear velocity, gravity
+    
     //std::cout<<"Jcom: \n"<<Jcom<<std::endl; 
     //std::cout<<"com: \n"<<com<<std::endl; 
     
@@ -366,8 +369,22 @@ void controller::getmodel()
 }
 void controller::Policy(py::module_& rl_module)
 {
-    std::vector<double> state = {ee_pos[1], ee_vel[1], q(13), dq(13), 0};  
-    std::cout<<"state done"<<std::endl;
+    // Normalize the angle to the range [0, 8π)
+    double universal_q = fmod(q(13), 8 * M_PI);
+
+    // Adjust to bring it into the range [-4π, 4π]
+    if (universal_q > 4 * M_PI) {
+        universal_q -= 8 * M_PI;
+    } else if (universal_q < -4 * M_PI) {
+        universal_q += 8 * M_PI;
+    }
+    
+    universal_q = -universal_q; // for policy coordinate
+    
+    
+    std::vector<double> state = {ee_pos[1], ee_vel[1],universal_q ,-dq(13),0};  
+    //std::cout<<"universal_q angel: "<<universal_q<<std::endl;
+    //std::cout<<"state done"<<std::endl;
     py::array_t<double> state_array(state.size(), state.data());
     // Call the Python function to get the control action
     py::object action = rl_module.attr("get_action")(state_array);
@@ -382,7 +399,7 @@ void controller::Policy(py::module_& rl_module)
     // Convert NumPy array to std::vector<double>
     Eigen::Map<Eigen::VectorXd> eigen_action(ptr, size);
     // Print the action (or apply it to your MuJoCo controller)
-    std::cout<<"control action: "<< eigen_action<<std::endl; 
+    //std::cout<<"control action: "<< eigen_action<<std::endl; 
     y_position = eigen_action[0]; //pos,vel,theta,theta dot
     y_vel = eigen_action[1];
 }
@@ -409,13 +426,24 @@ void controller::setDesireds()
     DesiredComPosition<<0,0,0.35;
     DesiredBodyPosition<<-0.06,0,0.35;
     DesiredBodyVel  << 0,0,0;
-    
     double current_time = mj_data_-> time;
-    double duration = 3;
-    // double y_position = 0.25*sin(3*3.14*current_time);
-    DesiredEEPosition << 0.1,y_position,0.65;
-    DesiredEEVel << 0, y_vel,0;
+    double duration = 10;
+    //y_position = 0.4*sin(2*3.14/duration*current_time);
     
+    if(current_time < 5)
+    {
+        y_position = 0;
+    }
+    
+   
+    // std::cout<<"deisred ee position: "<<y_position<<std::endl;
+    // std::cout<<"deisred ee velocity: "<<y_vel<<std::endl;
+ 
+    // y_limit : 0.4m 
+    DesiredEEPosition << 0.1,y_position,0.65; //y_position
+    DesiredEEVel << 0,0,0;//y_vel
+   
+   
     x_ref << DesiredBodyOrientation,DesiredBodyPosition,DesiredBodyOriVel,DesiredBodyVel,0,0,-9.81*m;
     
 
@@ -592,7 +620,7 @@ void controller::run()
     m = 0.0;
     for(size_t i = 0; i < mj_model_->nbody; ++i) {
         m += mj_model_->body_mass[i];
-        std::cout<<i<<" th mass: "<<mj_model_->body_mass[i]<<std::endl;
+        //std::cout<<i<<" th mass: "<<mj_model_->body_mass[i]<<std::endl;
     }
     
     //std::cout << "Total mass of the robot: " << m << " kg" << std::endl;
@@ -628,7 +656,7 @@ void controller::run()
             mpc.init(mpc_states,x_ref,delT,Rz,gI,r,m,Fc,qp); 
             mpc.solveProblem(qp);
             Eigen::VectorXd Fr =  mpc.getCtr();
-            //std::cout<<"Fr: "<<Fr.transpose()<<std::endl;
+            std::cout<<"Fr: "<<Fr.transpose()<<std::endl;
             qp.clearSolver();
 
             rSize = r.size();

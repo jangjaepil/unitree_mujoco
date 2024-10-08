@@ -5,7 +5,7 @@ from stable_baselines3.common.env_util import make_vec_env
 
 
 
-model = SAC.load("/home/jang/unitree_mujoco/simulate/src/RL/policies/sac_cartpole_dx(2)")
+model = SAC.load("/home/jang/unitree_mujoco/simulate/src/RL/policies/sac_cartpole_dx(5)")
 env = gym.make('CartPole-v1', max_episode_steps=1500, render_mode="human")
 
 obs,info = env.reset()

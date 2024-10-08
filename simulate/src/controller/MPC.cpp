@@ -329,7 +329,12 @@ bool MPC::solveProblem(OsqpEigen::Solver& solver)
 
         // get the controller input
         QPSolution = solver.getSolution();
-        ctr = QPSolution.block(15 * (mpcWindow + 1), 0, 3*rSize, 1);
+        Eigen::VectorXd ctr_tmp = QPSolution.block(15 * (mpcWindow + 1), 0, 3*rSize, 1);
+        if(!std::isnan(ctr_tmp(0)))
+        {
+           ctr = ctr_tmp; 
+        }
+        
         //ctr = QPSolution;
         //x0 = a*x0 + b* ctr;
       
