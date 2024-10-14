@@ -13,6 +13,7 @@ class controller
 {
     public:
             controller(mjModel *model, mjData *data);
+            ~controller();
             void run();
             void State2Vector();
             void convertCmd(std::vector<Eigen::VectorXd>& Cmds);
@@ -31,8 +32,9 @@ class controller
         int have_imu_ = false;
         int have_frame_sensor_ = false;
         
-        double y_position = 0;
-        double y_vel;
+        Eigen::VectorXd y_position;
+        Eigen::VectorXd y_vel;
+        
         unsigned int dof = 0; //number of joints + 6
         int number_of_joints = 0;
        
@@ -101,10 +103,16 @@ class controller
         Eigen::VectorXd MassPosition = Eigen::VectorXd::Zero(3);
         Eigen::VectorXd CoM = Eigen::VectorXd::Zero(3);
         Eigen::VectorXd CoMV = Eigen::VectorXd::Zero(3);
-
+        double sigma_time_steps = 0;
+        double current_time = 0;
+        unsigned long int iteration = 0;
+        int prediction = 100;
+        int percent = 0;
         int rSize = 0;
+        double universal_q = 0;
         Eigen::VectorXd motor_cmd;
         
         bool state_flag = 0;
+        
         
 };

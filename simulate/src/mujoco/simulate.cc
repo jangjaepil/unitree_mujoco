@@ -2181,6 +2181,13 @@ namespace mujoco
     if (pending_.reset)
     {
       mj_resetData(m_, d_);
+      int joint_id = mj_name2id(m_, mjOBJ_JOINT, "universal_joint_x");  // Replace with your joint name
+      int qpos_adr = m_->jnt_qposadr[joint_id];  // Get the address of the universal joint in qpos
+
+      // Set the two angles (for the two DOFs of the universal joint)
+      d_->qpos[qpos_adr] = M_PI; 
+
+
       mj_forward(m_, d_);
       update_profiler = true;
       update_sensor = true;

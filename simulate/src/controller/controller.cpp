@@ -1,10 +1,15 @@
 #include <controller.hpp>
-#include "matplotlibcpp.h"
+#include "gnuplot-iostream.h"
+#include <boost/tuple/tuple.hpp>
 #include <thread>
 
-namespace plt = matplotlibcpp;
+
 namespace py = pybind11;
 controller::controller(mjModel *model, mjData *data) : mj_model_(model), mj_data_(data)
+{
+   
+}
+controller::~controller()
 {
    
 }
@@ -370,21 +375,16 @@ void controller::getmodel()
 void controller::Policy(py::module_& rl_module)
 {
     // Normalize the angle to the range [0, 8π)
-    double universal_q = fmod(q(13), 8 * M_PI);
-
-    // Adjust to bring it into the range [-4π, 4π]
-    if (universal_q > 4 * M_PI) {
-        universal_q -= 8 * M_PI;
-    } else if (universal_q < -4 * M_PI) {
-        universal_q += 8 * M_PI;
-    }
-    
-    universal_q = -universal_q; // for policy coordinate
+  
+    std::cout<<"Raw_q: "<<-q(13)<<std::endl;
+    std::cout<<"Raw_dq: "<<-dq(12)<<std::endl;
+    //std::cout<<"universial_q: "<<universal_q<<std::endl;
+    std::cout<<"ee_pos: "<<ee_pos[1]<<std::endl;
+    std::cout<<"ee_vel: "<<ee_vel[1]<<std::endl;
     
     
-    std::vector<double> state = {ee_pos[1], ee_vel[1],universal_q ,-dq(13),0};  
-    //std::cout<<"universal_q angel: "<<universal_q<<std::endl;
-    //std::cout<<"state done"<<std::endl;
+    std::vector<double> state = {ee_pos[1], ee_vel[1],-q(13),-dq(12),0};  
+   
     py::array_t<double> state_array(state.size(), state.data());
     // Call the Python function to get the control action
     py::object action = rl_module.attr("get_action")(state_array);
@@ -400,8 +400,13 @@ void controller::Policy(py::module_& rl_module)
     Eigen::Map<Eigen::VectorXd> eigen_action(ptr, size);
     // Print the action (or apply it to your MuJoCo controller)
     //std::cout<<"control action: "<< eigen_action<<std::endl; 
-    y_position = eigen_action[0]; //pos,vel,theta,theta dot
-    y_vel = eigen_action[1];
+    y_position = eigen_action.segment(0,prediction); //pos,vel
+    y_vel = eigen_action.segment(prediction,prediction);
+   
+    
+
+    // dy->at(iteration) = y_position;
+    // dydot->at(iteration) = y_vel;
 }
 void controller::setDesireds()
 {
@@ -426,22 +431,59 @@ void controller::setDesireds()
     DesiredComPosition<<0,0,0.35;
     DesiredBodyPosition<<-0.06,0,0.35;
     DesiredBodyVel  << 0,0,0;
-    double current_time = mj_data_-> time;
-    double duration = 10;
-    //y_position = 0.4*sin(2*3.14/duration*current_time);
+    double last_time  = current_time;
     
-    if(current_time < 5)
-    {
-        y_position = 0;
-    }
+    current_time = mj_data_-> time;
+    double time_step  = current_time - last_time;
+    sigma_time_steps = sigma_time_steps + time_step;
     
    
-    // std::cout<<"deisred ee position: "<<y_position<<std::endl;
-    // std::cout<<"deisred ee velocity: "<<y_vel<<std::endl;
- 
+    double mean_step = sigma_time_steps/iteration;
+    std::cout<<"mean control peirod : "<<mean_step<<std::endl;
+    
+    
+    
+    if(iteration < 10000)
+    {
+        y_vel = Eigen::VectorXd::Zero(prediction);
+        y_position = Eigen::VectorXd::Zero(prediction);
+    }
+    else
+    {   
+        double duration = 3;
+        double length = 0.3;
+        //y_position = length*sin((2*3.14/duration)*current_time);
+        // y_vel =  (2*3.14/duration)*length*cos((2*3.14/duration)*current_time); //y_vel limit : 0.56m/s
+        
+        if(y_position(percent) >= length)
+        {
+            y_position(percent) = length;
+        }
+        else if(y_position(percent) <= -length)
+        {
+            y_position(percent) = -length;
+        }
+
+        if(y_vel(percent) >= 1)
+        {
+            y_vel(percent) = 1;
+        }
+        else if(y_vel(percent) <= -1)
+        {
+            y_vel(percent) = -1;
+        }
+    }
+
+
+    
+    
+    
+    std::cout<<"deisred ee position: "<<y_position(0)<<std::endl;
+    std::cout<<"deisred ee velocity: "<<y_vel(0)<<std::endl;
+    
     // y_limit : 0.4m 
-    DesiredEEPosition << 0.1,y_position,0.65; //y_position
-    DesiredEEVel << 0,0,0;//y_vel
+    DesiredEEPosition << 0.15,y_position(percent),0.65; //y_position
+    DesiredEEVel << 0,y_vel(percent),0;//y_vel
    
    
     x_ref << DesiredBodyOrientation,DesiredBodyPosition,DesiredBodyOriVel,DesiredBodyVel,0,0,-9.81*m;
@@ -493,6 +535,10 @@ void controller::setDesireds()
     alldesired_x_2dot.push_back(DesiredEEOriAcc);
     alldesired_x_2dot.push_back(DesiredEEAcc);
     
+    Eigen::MatrixXd kp_ori = 800*Eigen::MatrixXd::Identity(3,3);
+    Eigen::MatrixXd kd_ori = 15*Eigen::MatrixXd::Identity(3,3);
+    Eigen::MatrixXd kp_ee = 1000*Eigen::MatrixXd::Identity(3,3);
+    Eigen::MatrixXd kd_ee = 300*Eigen::MatrixXd::Identity(3,3);
     Eigen::MatrixXd kp_temp = 500*Eigen::MatrixXd::Identity(3,3);
     Eigen::MatrixXd kd_temp = 15*Eigen::MatrixXd::Identity(3,3);
     
@@ -501,9 +547,23 @@ void controller::setDesireds()
     
     for(int i = 0;i<alldesired_x.size();i++)
     {
-    
-        kp.push_back(kp_temp);
-        kd.push_back(kd_temp);
+        if(i == 2) // end-effector rotation
+        {
+            kp.push_back(kp_ori);
+            kd.push_back(kd_ori);
+        }
+        else if(i == 3) // end-effector translation
+        {
+            kp.push_back(kp_ee);
+            kd.push_back(kd_ee);
+        }
+        else
+        {
+            kp.push_back(kp_temp);
+            kd.push_back(kd_temp);
+
+        }
+        
     }
     
 }
@@ -629,16 +689,30 @@ void controller::run()
     sys.attr("path").attr("append")("/home/jang/unitree_mujoco/simulate/src/RL/");
     py::module_ rl_module = py::module_::import("Policy"); 
 
-    
+
     
     double delT = 0.04;
-    double Fc = 0.01;
+    double Fc = 1;
     
     Eigen::Matrix3d bI = 40*Eigen::MatrixXd::Identity(3,3);
-   
+    
     MPC mpc;
     WBIC wbic;
-  
+
+    Gnuplot gp;
+    std::vector<double> time_steps;          // X-axis: time steps
+    std::vector<double> desired_y_pos;       // Y-axis: desired y position
+    std::vector<double> actual_y_pos;        // Y-axis: actual y position
+    std::vector<double> desired_y_vel;       // Y-axis: desired y velocity
+    std::vector<double> actual_y_vel;        // Y-axis: actual y velocity
+    std::vector<double> end_q;
+    std::vector<double> end_qd;
+    
+    percent = 0;
+    bool plot = 1;
+    int n = 10000;
+    prediction = 1;
+
     while (1) 
     {
         
@@ -649,9 +723,25 @@ void controller::run()
             }
        
             Eigen::Matrix3d gI = Rz*bI*Rz.transpose();
+            
             getmodel();
-            Policy(rl_module);
+       
+    
+            // if(percent == 0)
+            // {
+            //     Policy(rl_module);
+            // }
+
             setDesireds();
+            
+            actual_y_pos.push_back(ee_pos[1]);
+            actual_y_vel.push_back(ee_vel[1]);
+            desired_y_pos.push_back(y_position(percent));
+            desired_y_vel.push_back(y_vel(percent));
+            time_steps.push_back(iteration);
+            end_q.push_back(-q(13));
+            end_qd.push_back(-dq(12));
+            
             OsqpEigen::Solver qp;
             mpc.init(mpc_states,x_ref,delT,Rz,gI,r,m,Fc,qp); 
             mpc.solveProblem(qp);
@@ -675,8 +765,44 @@ void controller::run()
             std::vector<Eigen::VectorXd> cmd = wbic.WBIC_getCtr(); 
             convertCmd(cmd);
             QP.clearSolver();
-  
+
+            if(iteration > n && plot)
+            {
+                   // Set labels and title
+                gp << "set xlabel 'Time Step'\n";
+                gp << "set ylabel 'Values'\n";
+                gp << "set title 'Comparison of Desired and Actual Y Position and Velocity'\n";
+
+                // Plotting with different colors and adding legends
+                gp << "plot '-' with lines lw 2 linecolor rgb 'blue' title 'Desired Y Position',"
+                      " '-' with lines lw 2 linecolor rgb 'red' title 'Actual Y Position',"
+                      " '-' with lines lw 2 linecolor rgb 'green' title 'Desired Y Velocity',"
+                      " '-' with lines lw 2 linecolor rgb 'magenta' title 'Actual Y Velocity',"
+                      " '-' with lines lw 2 linecolor rgb 'green' title 'theta',"
+                      " '-' with lines lw 2 linecolor rgb 'magenta' title 'theta Velocity'\n";
+
+                // Send the data to gnuplot
+                gp.send1d(boost::make_tuple(time_steps, desired_y_pos));   // Plot 1: Desired Y Position
+                gp.send1d(boost::make_tuple(time_steps, actual_y_pos));    // Plot 2: Actual Y Position
+                gp.send1d(boost::make_tuple(time_steps, desired_y_vel));   // Plot 3: Desired Y Velocity
+                gp.send1d(boost::make_tuple(time_steps, actual_y_vel));    // Plot 4: Actual Y Velocity
+                gp.send1d(boost::make_tuple(time_steps, end_q));            // Plot 5: Theta
+                gp.send1d(boost::make_tuple(time_steps, end_qd));           // Plot 6: Theta Velocity
+
+                // std::cout<<"print"<<std::endl;
+                // gp << "set xrange [0:1500]\nset yrange [-2:2]\n";
+                // gp << "plot '-' with vectors title 'OBS'\n";
+	            // gp.send1d(boost::make_tuple(step,DY,YVEL, DYVEL));
+                plot = 0;
+                
+            }
+            iteration = iteration + 1;
+            percent = iteration%prediction;
+            std::cout<<"percent: "<<percent<<std::endl;
+    
     }
+
+
 }
 
 
