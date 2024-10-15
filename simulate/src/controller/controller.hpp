@@ -61,7 +61,8 @@ class controller
         Eigen::VectorXd ee_OriVel = Eigen::VectorXd::Zero(3);
         Eigen::VectorXd ee_pos = Eigen::VectorXd::Zero(3); 
         Eigen::VectorXd ee_vel = Eigen::VectorXd::Zero(3); 
-
+        Eigen::Vector3d com = Eigen::VectorXd::Zero(3);
+        
         Eigen::MatrixXd jacobian_pos;
         Eigen::MatrixXd jacobian_rot;
         Eigen::MatrixXd Jc;
@@ -109,6 +110,7 @@ class controller
         int prediction = 100;
         int percent = 0;
         int rSize = 0;
+        int trajectory_start = 0;
         double universal_q = 0;
         Eigen::VectorXd motor_cmd;
         

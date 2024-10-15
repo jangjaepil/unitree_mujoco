@@ -279,7 +279,7 @@ void controller::getmodel()
     
     Eigen::MatrixXd Jcom(3, mj_model_->nv);
     Jcom.setZero();  // Initialize to zero
-    Eigen::Vector3d com(0, 0, 0);
+    
     double total_mass = 0.0;
     Eigen::MatrixXd J_pos(3, mj_model_->nv);
     J_pos.setZero();
@@ -376,11 +376,11 @@ void controller::Policy(py::module_& rl_module)
 {
     // Normalize the angle to the range [0, 8π)
   
-    std::cout<<"Raw_q: "<<-q(13)<<std::endl;
-    std::cout<<"Raw_dq: "<<-dq(12)<<std::endl;
+    // std::cout<<"Raw_q: "<<-q(13)<<std::endl;
+    // std::cout<<"Raw_dq: "<<-dq(12)<<std::endl;
     //std::cout<<"universial_q: "<<universal_q<<std::endl;
-    std::cout<<"ee_pos: "<<ee_pos[1]<<std::endl;
-    std::cout<<"ee_vel: "<<ee_vel[1]<<std::endl;
+    // std::cout<<"ee_pos: "<<ee_pos[1]<<std::endl;
+    // std::cout<<"ee_vel: "<<ee_vel[1]<<std::endl;
     
     
     std::vector<double> state = {ee_pos[1], ee_vel[1],-q(13),-dq(12),0};  
@@ -439,11 +439,11 @@ void controller::setDesireds()
     
    
     double mean_step = sigma_time_steps/iteration;
-    std::cout<<"mean control peirod : "<<mean_step<<std::endl;
+    //std::cout<<"mean control peirod : "<<mean_step<<std::endl;
     
     
     
-    if(iteration < 10000)
+    if(iteration < trajectory_start)
     {
         y_vel = Eigen::VectorXd::Zero(prediction);
         y_position = Eigen::VectorXd::Zero(prediction);
@@ -452,8 +452,8 @@ void controller::setDesireds()
     {   
         double duration = 3;
         double length = 0.3;
-        //y_position = length*sin((2*3.14/duration)*current_time);
-        // y_vel =  (2*3.14/duration)*length*cos((2*3.14/duration)*current_time); //y_vel limit : 0.56m/s
+        y_position(percent) = length*sin((2*3.14/duration)*current_time);
+        y_vel(percent) =  (2*3.14/duration)*length*cos((2*3.14/duration)*current_time); //y_vel limit : 0.56m/s
         
         if(y_position(percent) >= length)
         {
@@ -478,8 +478,8 @@ void controller::setDesireds()
     
     
     
-    std::cout<<"deisred ee position: "<<y_position(0)<<std::endl;
-    std::cout<<"deisred ee velocity: "<<y_vel(0)<<std::endl;
+    // std::cout<<"deisred ee position: "<<y_position(0)<<std::endl;
+    // std::cout<<"deisred ee velocity: "<<y_vel(0)<<std::endl;
     
     // y_limit : 0.4m 
     DesiredEEPosition << 0.15,y_position(percent),0.65; //y_position
@@ -707,10 +707,13 @@ void controller::run()
     std::vector<double> actual_y_vel;        // Y-axis: actual y velocity
     std::vector<double> end_q;
     std::vector<double> end_qd;
-    
+    std::vector<double> COM_X;
+    std::vector<double> COM_Y;
+    std::vector<double> COM_Z;
     percent = 0;
     bool plot = 1;
-    int n = 10000;
+    int record_end = 10000;
+    trajectory_start = 3000;
     prediction = 1;
 
     while (1) 
@@ -733,7 +736,7 @@ void controller::run()
             // }
 
             setDesireds();
-            
+            //std::cout<<"com: "<<com.transpose()<<std::endl;
             actual_y_pos.push_back(ee_pos[1]);
             actual_y_vel.push_back(ee_vel[1]);
             desired_y_pos.push_back(y_position(percent));
@@ -741,12 +744,15 @@ void controller::run()
             time_steps.push_back(iteration);
             end_q.push_back(-q(13));
             end_qd.push_back(-dq(12));
-            
+            COM_X.push_back(com[0]);
+            COM_Y.push_back(com[1]);
+            COM_Z.push_back(com[2]);
+
             OsqpEigen::Solver qp;
             mpc.init(mpc_states,x_ref,delT,Rz,gI,r,m,Fc,qp); 
             mpc.solveProblem(qp);
             Eigen::VectorXd Fr =  mpc.getCtr();
-            std::cout<<"Fr: "<<Fr.transpose()<<std::endl;
+            //std::cout<<"Fr: "<<Fr.transpose()<<std::endl;
             qp.clearSolver();
 
             rSize = r.size();
@@ -766,7 +772,7 @@ void controller::run()
             convertCmd(cmd);
             QP.clearSolver();
 
-            if(iteration > n && plot)
+            if((iteration > record_end) && plot)
             {
                    // Set labels and title
                 gp << "set xlabel 'Time Step'\n";
@@ -779,8 +785,11 @@ void controller::run()
                       " '-' with lines lw 2 linecolor rgb 'green' title 'Desired Y Velocity',"
                       " '-' with lines lw 2 linecolor rgb 'magenta' title 'Actual Y Velocity',"
                       " '-' with lines lw 2 linecolor rgb 'green' title 'theta',"
-                      " '-' with lines lw 2 linecolor rgb 'magenta' title 'theta Velocity'\n";
-
+                      " '-' with lines lw 2 linecolor rgb 'magenta' title 'theta Velocity',"
+                      " '-' with lines lw 2 linecolor rgb 'red' title 'COM X Position',"
+                      " '-' with lines lw 2 linecolor rgb 'green' title 'COM Y Position',"
+                      " '-' with lines lw 2 linecolor rgb 'blue' title 'COM Z Position'\n";
+                      
                 // Send the data to gnuplot
                 gp.send1d(boost::make_tuple(time_steps, desired_y_pos));   // Plot 1: Desired Y Position
                 gp.send1d(boost::make_tuple(time_steps, actual_y_pos));    // Plot 2: Actual Y Position
@@ -788,7 +797,9 @@ void controller::run()
                 gp.send1d(boost::make_tuple(time_steps, actual_y_vel));    // Plot 4: Actual Y Velocity
                 gp.send1d(boost::make_tuple(time_steps, end_q));            // Plot 5: Theta
                 gp.send1d(boost::make_tuple(time_steps, end_qd));           // Plot 6: Theta Velocity
-
+                gp.send1d(boost::make_tuple(time_steps, COM_X));
+                gp.send1d(boost::make_tuple(time_steps, COM_Y));
+                gp.send1d(boost::make_tuple(time_steps, COM_Z));
                 // std::cout<<"print"<<std::endl;
                 // gp << "set xrange [0:1500]\nset yrange [-2:2]\n";
                 // gp << "plot '-' with vectors title 'OBS'\n";
@@ -798,7 +809,7 @@ void controller::run()
             }
             iteration = iteration + 1;
             percent = iteration%prediction;
-            std::cout<<"percent: "<<percent<<std::endl;
+            //std::cout<<"percent: "<<percent<<std::endl;
     
     }
 
