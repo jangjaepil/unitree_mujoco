@@ -2,10 +2,64 @@
 #include "gnuplot-iostream.h"
 #include <boost/tuple/tuple.hpp>
 #include <thread>
+#include <fstream>
+#include <filesystem>
+
+void write_label_to_csv(std::string filename, std::vector<std::string> labels)
+{
+    std::filesystem::path filePath(filename);
+    std::filesystem::path dirPath = filePath.parent_path(); // get the directory path
+
+    if (!std::filesystem::exists(dirPath)) {
+        if(!std::filesystem::create_directories(dirPath)){
+            std::cerr << "Err : cannot create the directory" << dirPath << std::endl;
+            return;
+        }
+    }
+
+    std::ofstream file;
+    file.open(filename);
+    if (!file.is_open()) {
+        std::cerr << "Err : cannot open the file" << filename << std::endl;
+        return;
+    }
+
+    for(int i=0; i<labels.size(); i++)
+    {
+        file << labels[i];
+        if(i != labels.size()-1)
+            file << ",";
+    }
+    file << std::endl;
+    file.close();
+}
+
+void write_data_to_csv(std::string& filename, std::vector<double>& time, std::vector<double>& data, bool append=true)
+{
+    std::ofstream file;
+    file.open(filename, append ? std::ios_base::app : std::ios_base::out);
+    if (!file.is_open()) {
+        std::cerr << "Err : cannot open the file" << filename << std::endl;
+        return;
+    }
+    if(time.size() != data.size())
+    {
+        std::cerr << "Err : time.size() != data.size()" << std::endl;
+        return;
+    }
+    for(int i=0; i<time.size(); i++)
+    {
+        file << time[i] << ",";
+        file << data[i];
+        file << std::endl;
+    }
+    file.close();
+}
+
 
 
 namespace py = pybind11;
-controller::controller(mjModel *model, mjData *data) : mj_model_(model), mj_data_(data)
+controller::controller(mjModel *model, mjData *data) : mj_model_(model), mj_data_(data)  
 {
    
 }
@@ -374,39 +428,31 @@ void controller::getmodel()
 }
 void controller::Policy(py::module_& rl_module)
 {
-    // Normalize the angle to the range [0, 8π)
-  
-    // std::cout<<"Raw_q: "<<-q(13)<<std::endl;
-    // std::cout<<"Raw_dq: "<<-dq(12)<<std::endl;
-    //std::cout<<"universial_q: "<<universal_q<<std::endl;
-    // std::cout<<"ee_pos: "<<ee_pos[1]<<std::endl;
-    // std::cout<<"ee_vel: "<<ee_vel[1]<<std::endl;
     
-    
-    std::vector<double> state = {ee_pos[1], ee_vel[1],-q(13),-dq(12),0};  
-   
-    py::array_t<double> state_array(state.size(), state.data());
-    // Call the Python function to get the control action
-    py::object action = rl_module.attr("get_action")(state_array);
-    
-    
-    // Convert the result back to C++ (vector of doubles)
-    py::array_t<double> action_array = action.cast<py::array_t<double>>();
-    py::buffer_info buf = action_array.request();
-    double *ptr = static_cast<double *>(buf.ptr);
-    size_t size = buf.size;
-    
-    // Convert NumPy array to std::vector<double>
-    Eigen::Map<Eigen::VectorXd> eigen_action(ptr, size);
-    // Print the action (or apply it to your MuJoCo controller)
-    //std::cout<<"control action: "<< eigen_action<<std::endl; 
-    y_position = eigen_action.segment(0,prediction); //pos,vel
-    y_vel = eigen_action.segment(prediction,prediction);
-   
-    
-
-    // dy->at(iteration) = y_position;
-    // dydot->at(iteration) = y_vel;
+    py::array_t<double> state_array = py::array_t<double>(4);
+    double* state_ptr = static_cast<double*>(state_array.mutable_data());
+    // Set the state vector values
+    state_ptr[0] = ee_pos[1];  // End-effector position (Y-axis)
+    state_ptr[1] = -q(13);     // Inverted pendulum angle
+    state_ptr[2] = ee_vel[1];  // End-effector velocity (Y-axis)
+    state_ptr[3] = -dq(12);    // Inverted pendulum angular velocity
+    py::object action;
+    {
+        // Minimize the scope where the GIL is held (only during the Python call)
+        py::gil_scoped_acquire acquire;
+        
+        // Call the Python function to get the control action
+        action = rl_module.attr("get_action")(state_array);
+    } 
+        // Convert the result back to C++ (vector of doubles)
+        py::array_t<double> action_array = action.cast<py::array_t<double>>();
+        py::buffer_info buf = action_array.request();
+        // Use Eigen::Map to directly map the result without creating a new array
+        double *ptr = static_cast<double *>(buf.ptr);
+        
+        y_position(percent) = ptr[0];
+        y_vel(percent) = ptr[1];
+       
 }
 void controller::setDesireds()
 {
@@ -440,52 +486,28 @@ void controller::setDesireds()
    
     double mean_step = sigma_time_steps/iteration;
     //std::cout<<"mean control peirod : "<<mean_step<<std::endl;
-    
-    
-    
+    // double duration = 1;
+    // double length = 0.15;  // y: 0.3, x: 0.25
+    //y_position(percent) = length*sin((2*3.14/duration)*current_time);
+    //y_vel(percent) =  (2*3.14/duration)*length*cos((2*3.14/duration)*current_time); //y_vel limit : 0.56m/s
+    //y_acc = length*sin((2*3.14/duration)*current_time);
+        
+   
+    double init_x = 0.15;
     if(iteration < trajectory_start)
     {
-        y_vel = Eigen::VectorXd::Zero(prediction);
-        y_position = Eigen::VectorXd::Zero(prediction);
+        DesiredEEPosition <<init_x,0,0.65; 
+        DesiredEEVel << 0,0,0; 
     }
     else
     {   
-        double duration = 3;
-        double length = 0.3;
-        y_position(percent) = length*sin((2*3.14/duration)*current_time);
-        y_vel(percent) =  (2*3.14/duration)*length*cos((2*3.14/duration)*current_time); //y_vel limit : 0.56m/s
-        
-        if(y_position(percent) >= length)
-        {
-            y_position(percent) = length;
-        }
-        else if(y_position(percent) <= -length)
-        {
-            y_position(percent) = -length;
-        }
-
-        if(y_vel(percent) >= 1)
-        {
-            y_vel(percent) = 1;
-        }
-        else if(y_vel(percent) <= -1)
-        {
-            y_vel(percent) = -1;
-        }
+        //DesiredEEPosition <<init_x,0,0.65; 
+        //DesiredEEVel << 0,0,0;
+        DesiredEEPosition <<init_x,y_position(percent),0.65; 
+        DesiredEEVel << 0,y_vel(percent),0; 
     }
-
-
     
-    
-    
-    // std::cout<<"deisred ee position: "<<y_position(0)<<std::endl;
-    // std::cout<<"deisred ee velocity: "<<y_vel(0)<<std::endl;
-    
-    // y_limit : 0.4m 
-    DesiredEEPosition << 0.15,y_position(percent),0.65; //y_position
-    DesiredEEVel << 0,y_vel(percent),0;//y_vel
-   
-   
+    DesiredEEAcc<<0,0,0;
     x_ref << DesiredBodyOrientation,DesiredBodyPosition,DesiredBodyOriVel,DesiredBodyVel,0,0,-9.81*m;
     
 
@@ -537,11 +559,21 @@ void controller::setDesireds()
     
     Eigen::MatrixXd kp_ori = 800*Eigen::MatrixXd::Identity(3,3);
     Eigen::MatrixXd kd_ori = 15*Eigen::MatrixXd::Identity(3,3);
-    Eigen::MatrixXd kp_ee = 1000*Eigen::MatrixXd::Identity(3,3);
-    Eigen::MatrixXd kd_ee = 300*Eigen::MatrixXd::Identity(3,3);
-    Eigen::MatrixXd kp_temp = 500*Eigen::MatrixXd::Identity(3,3);
-    Eigen::MatrixXd kd_temp = 15*Eigen::MatrixXd::Identity(3,3);
+    Eigen::Matrix3d kp_ee = Eigen::MatrixXd::Identity(3,3); 
+    kp_ee   << 1000,0,0,
+               0,1000,0,
+               0,0,1000;
+    Eigen::Matrix3d kd_ee = Eigen::MatrixXd::Identity(3,3); 
+    kd_ee   << 300,0,0,
+               0,300,0,
+               0,0,300;
+    //Eigen::MatrixXd kp_ee = 1000*Eigen::MatrixXd::Identity(3,3);
+    //Eigen::MatrixXd kd_ee = 300*Eigen::MatrixXd::Identity(3,3);
+    Eigen::MatrixXd kp_temp = 500*Eigen::MatrixXd::Identity(3,3); //500
+    Eigen::MatrixXd kd_temp = 15*Eigen::MatrixXd::Identity(3,3); //15
     
+
+
     kp.clear();
     kd.clear();    
     
@@ -590,12 +622,15 @@ void controller::convertCmd(std::vector<Eigen::VectorXd>& Cmds)
         Crt_q(3) = q_cmd(7);
         Crt_q(4) = q_cmd(8);
         Crt_q(5) = q_cmd(9);
+
         Crt_q(0) = q_cmd(10);
         Crt_q(1) = q_cmd(11);
         Crt_q(2) = q_cmd(12);
+
         Crt_q(9) = q_cmd(13);
         Crt_q(10) = q_cmd(14);
         Crt_q(11) = q_cmd(15);
+
         Crt_q(6) = q_cmd(16);
         Crt_q(7) = q_cmd(17);
         Crt_q(8) = q_cmd(18);
@@ -607,15 +642,19 @@ void controller::convertCmd(std::vector<Eigen::VectorXd>& Cmds)
         Crt_dq(15) = dq_cmd(3);
         Crt_dq(16) = dq_cmd(4);
         Crt_dq(17) = dq_cmd(5);
+
         Crt_dq(3) = dq_cmd(7);
         Crt_dq(4) = dq_cmd(8);
         Crt_dq(5) = dq_cmd(9);
+
         Crt_dq(0) = dq_cmd(10);
         Crt_dq(1) = dq_cmd(11);
         Crt_dq(2) = dq_cmd(12);
+
         Crt_dq(9) = dq_cmd(13);
         Crt_dq(10) = dq_cmd(14);
         Crt_dq(11) = dq_cmd(15);
+
         Crt_dq(6) = dq_cmd(16);
         Crt_dq(7) = dq_cmd(17);
         Crt_dq(8) = dq_cmd(18);
@@ -626,15 +665,19 @@ void controller::convertCmd(std::vector<Eigen::VectorXd>& Cmds)
         Crt_tau(15) = tau_cmd(3);
         Crt_tau(16) = tau_cmd(4);
         Crt_tau(17) = tau_cmd(5);
+
         Crt_tau(3) = tau_cmd(7);
         Crt_tau(4) = tau_cmd(8);
         Crt_tau(5) = tau_cmd(9);
+
         Crt_tau(0) = tau_cmd(10);
         Crt_tau(1) = tau_cmd(11);
         Crt_tau(2) = tau_cmd(12);
+
         Crt_tau(9) = tau_cmd(13);
         Crt_tau(10) = tau_cmd(14);
         Crt_tau(11) = tau_cmd(15);
+
         Crt_tau(6) = tau_cmd(16);
         Crt_tau(7) = tau_cmd(17);
         Crt_tau(8) = tau_cmd(18);
@@ -680,10 +723,10 @@ void controller::run()
     m = 0.0;
     for(size_t i = 0; i < mj_model_->nbody; ++i) {
         m += mj_model_->body_mass[i];
-        //std::cout<<i<<" th mass: "<<mj_model_->body_mass[i]<<std::endl;
+        std::cout<<i<<" th mass: "<<mj_model_->body_mass[i]<<std::endl;
     }
     
-    //std::cout << "Total mass of the robot: " << m << " kg" << std::endl;
+    std::cout << "Total mass of the robot: " << m << " kg" << std::endl;
     py::scoped_interpreter guard{};
     py::module_ sys = py::module_::import("sys");
     sys.attr("path").attr("append")("/home/jang/unitree_mujoco/simulate/src/RL/");
@@ -707,14 +750,22 @@ void controller::run()
     std::vector<double> actual_y_vel;        // Y-axis: actual y velocity
     std::vector<double> end_q;
     std::vector<double> end_qd;
-    std::vector<double> COM_X;
-    std::vector<double> COM_Y;
-    std::vector<double> COM_Z;
+
+    // std::vector<double> COM_X;
+    // std::vector<double> COM_Y;
+    // std::vector<double> COM_Z;
+    
+    
+
     percent = 0;
     bool plot = 1;
     int record_end = 10000;
     trajectory_start = 3000;
     prediction = 1;
+    
+    y_vel = Eigen::VectorXd::Zero(prediction);
+    y_position = Eigen::VectorXd::Zero(prediction);
+    
 
     while (1) 
     {
@@ -729,12 +780,10 @@ void controller::run()
             
             getmodel();
        
-    
-            // if(percent == 0)
-            // {
-            //     Policy(rl_module);
-            // }
-
+            if(percent == 0)
+            {
+                Policy(rl_module);
+            }
             setDesireds();
             //std::cout<<"com: "<<com.transpose()<<std::endl;
             actual_y_pos.push_back(ee_pos[1]);
@@ -744,9 +793,9 @@ void controller::run()
             time_steps.push_back(iteration);
             end_q.push_back(-q(13));
             end_qd.push_back(-dq(12));
-            COM_X.push_back(com[0]);
-            COM_Y.push_back(com[1]);
-            COM_Z.push_back(com[2]);
+            // COM_X.push_back(com[0]);
+            // COM_Y.push_back(com[1]);
+            // COM_Z.push_back(com[2]);
 
             OsqpEigen::Solver qp;
             mpc.init(mpc_states,x_ref,delT,Rz,gI,r,m,Fc,qp); 
@@ -774,6 +823,27 @@ void controller::run()
 
             if((iteration > record_end) && plot)
             {
+                std::string actual_pos_filename = "/home/jang/unitree_mujoco/simulate/csv/actual_position.csv";
+                std::string actual_vel_filename = "/home/jang/unitree_mujoco/simulate/csv/actual_velocity.csv";
+                std::string desired_pos_filename = "/home/jang/unitree_mujoco/simulate/csv/desired_position.csv";
+                std::string desired_vel_filename = "/home/jang/unitree_mujoco/simulate/csv/desired_velocity.csv";
+                std::string angle_pos_filename = "/home/jang/unitree_mujoco/simulate/csv/angle_position.csv";
+                std::string angle_vel_filename = "/home/jang/unitree_mujoco/simulate/csv/angle_velocity.csv";
+    
+                write_label_to_csv(actual_pos_filename,{"time","y"});
+                write_label_to_csv(actual_vel_filename,{"time","y"});
+                write_label_to_csv(desired_pos_filename,{"time","y"});
+                write_label_to_csv(desired_vel_filename,{"time","y"});
+                write_label_to_csv(angle_pos_filename,{"time","theta"});
+                write_label_to_csv(angle_vel_filename,{"time","theta_dot"});
+
+                write_data_to_csv(actual_pos_filename,time_steps,actual_y_pos);
+                write_data_to_csv(actual_vel_filename,time_steps,actual_y_vel);
+                write_data_to_csv(desired_pos_filename,time_steps,desired_y_pos);
+                write_data_to_csv(desired_vel_filename,time_steps,desired_y_vel);
+                write_data_to_csv(angle_pos_filename,time_steps,end_q);
+                write_data_to_csv(angle_vel_filename,time_steps,end_qd);
+
                    // Set labels and title
                 gp << "set xlabel 'Time Step'\n";
                 gp << "set ylabel 'Values'\n";
@@ -785,30 +855,37 @@ void controller::run()
                       " '-' with lines lw 2 linecolor rgb 'green' title 'Desired Y Velocity',"
                       " '-' with lines lw 2 linecolor rgb 'magenta' title 'Actual Y Velocity',"
                       " '-' with lines lw 2 linecolor rgb 'green' title 'theta',"
-                      " '-' with lines lw 2 linecolor rgb 'magenta' title 'theta Velocity',"
-                      " '-' with lines lw 2 linecolor rgb 'red' title 'COM X Position',"
-                      " '-' with lines lw 2 linecolor rgb 'green' title 'COM Y Position',"
-                      " '-' with lines lw 2 linecolor rgb 'blue' title 'COM Z Position'\n";
-                      
+                      " '-' with lines lw 2 linecolor rgb 'magenta' title 'theta Velocity',\n";
+                
+                // gp << "plot '-' with lines lw 2 linecolor rgb 'red' title 'Desired X Position',"
+                //       " '-' with lines lw 2 linecolor rgb 'green' title 'Actual X Position',"
+                //       " '-' with lines lw 2 linecolor rgb 'magenta' title 'Desired X Velocity',"
+                //       " '-' with lines lw 2 linecolor rgb 'magenta' title 'Actual X Velocity',"
+                //       " '-' with lines lw 2 linecolor rgb 'red' title 'COM X Position',"
+                //       " '-' with lines lw 2 linecolor rgb 'green' title 'COM Y Position',"
+                //       " '-' with lines lw 2 linecolor rgb 'blue' title 'COM Z Position'\n";
+
+
                 // Send the data to gnuplot
                 gp.send1d(boost::make_tuple(time_steps, desired_y_pos));   // Plot 1: Desired Y Position
                 gp.send1d(boost::make_tuple(time_steps, actual_y_pos));    // Plot 2: Actual Y Position
                 gp.send1d(boost::make_tuple(time_steps, desired_y_vel));   // Plot 3: Desired Y Velocity
                 gp.send1d(boost::make_tuple(time_steps, actual_y_vel));    // Plot 4: Actual Y Velocity
+                
+             
+                
                 gp.send1d(boost::make_tuple(time_steps, end_q));            // Plot 5: Theta
                 gp.send1d(boost::make_tuple(time_steps, end_qd));           // Plot 6: Theta Velocity
-                gp.send1d(boost::make_tuple(time_steps, COM_X));
-                gp.send1d(boost::make_tuple(time_steps, COM_Y));
-                gp.send1d(boost::make_tuple(time_steps, COM_Z));
-                // std::cout<<"print"<<std::endl;
-                // gp << "set xrange [0:1500]\nset yrange [-2:2]\n";
-                // gp << "plot '-' with vectors title 'OBS'\n";
-	            // gp.send1d(boost::make_tuple(step,DY,YVEL, DYVEL));
+                
+               
+                // gp.send1d(boost::make_tuple(time_steps, COM_X));
+                // gp.send1d(boost::make_tuple(time_steps, COM_Y));
+                // gp.send1d(boost::make_tuple(time_steps, COM_Z));
                 plot = 0;
                 
             }
             iteration = iteration + 1;
-            percent = iteration%prediction;
+            //percent = iteration%prediction;
             //std::cout<<"percent: "<<percent<<std::endl;
     
     }

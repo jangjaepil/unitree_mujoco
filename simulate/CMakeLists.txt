@@ -27,7 +27,8 @@ FILE (GLOB SIM_SRC
         src/joystick/joystick.cc
         src/mujoco/*.cc
         src/unitree_sdk2_bridge/*.cc
-        src/controller/*.cpp)
+        src/controller/*.cpp
+        src/controller/LowPassFilter.cpp)
 
 set(SIM_DEPENDENCIES 
     pthread

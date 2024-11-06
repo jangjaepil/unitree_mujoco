@@ -1,7 +1,7 @@
 <mujoco model="go2">
-  <compiler angle="radian" meshdir="assets" autolimits="true" />
+  <compiler angle="radian" meshdir="assets" autolimits="true" inertiafromgeom="false"/>
 
-  <option cone="elliptic" impratio="100" />
+  <option cone="elliptic" impratio="100" gravity="0 0 -9.81" integrator="Euler"/>
 
   <default>
     
@@ -118,9 +118,9 @@
     <mesh file="foot.obj" />
 
   </asset>
-
+  
   <worldbody>
-    <body name="base_link" pos="0 0 0.445" childclass="go2">
+f    <body name="base_link" pos="0 0 0.445" childclass="go2">
       <inertial pos="0.021112 0 -0.005366" quat="-0.000543471 0.713435 -0.00173769 0.700719"
         mass="6.921"
         diaginertia="0.107027 0.0980771 0.0244531" />
@@ -176,11 +176,12 @@
                                     <geom mesh="z1_Link06" material="gray" class="visual" />
 
                                     <body name="universal_link" pos="0.073 0 0">
-                                      <inertial pos="0 0 0.1" mass="0.25" diaginertia="0.0009333 0.0009333 0.00005" />
-                                      <!-- universal_joint_x: Passive joint with no limits -->
-                                      <joint name="universal_joint_x" pos="0 0 0" axis="1 0 0" damping="0" frictionloss="0"/>
-                                      <geom size="0.02 0.1" pos="0 0 0.1" type="cylinder" rgba="0.671705 0.692426 0.774270 1" class="visual"/>
-                                  </body>
+                                      <inertial pos="0 0 0.1" mass="0.25" diaginertia="0.000858 0.000858 0.00005"/>
+                                      <joint name="universal_joint_x" pos="0 0 0" axis="1 0 0" damping="0" frictionloss="0.0022"/>
+                                      <geom name="cpole" fromto="0 0 0 0 0 0.2" size="0.01" type="cylinder" rgba="0 0.7 0.7 1" class="visual"/> <!-- Pole length set to 0.2 m -->
+            
+                                      <!-- <geom size="0.02 0.1" pos="0 0 0" type="cylinder" rgba="0.671705 0.692426 0.774270 1" class="visual"/>  -->
+                                    </body>
                                 </body>
                             </body>
                         </body>
@@ -423,7 +424,7 @@
     <jointactuatorfrc name="z1_Link04_torque" joint="joint4" noise="0.01" />
     <jointactuatorfrc name="z1_Link05_torque" joint="joint5" noise="0.01" />
     <jointactuatorfrc name="z1_Link06_torque" joint="joint6" noise="0.01" />
-     <jointactuatorfrc name="universal_torque" joint="universal_joint_x" noise="0.01"/>
+    <jointactuatorfrc name="universal_torque" joint="universal_joint_x" noise="0"/>
 
     <framequat name="imu_quat" objtype="site" objname="imu" />
     <gyro name="imu_gyro" site="imu" />

@@ -2185,7 +2185,7 @@ namespace mujoco
       int qpos_adr = m_->jnt_qposadr[joint_id];  // Get the address of the universal joint in qpos
 
       // Set the two angles (for the two DOFs of the universal joint)
-      d_->qpos[qpos_adr] = M_PI; 
+      d_->qpos[qpos_adr] = -3.14; 
 
 
       mj_forward(m_, d_);
