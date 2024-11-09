@@ -30,7 +30,7 @@ pole_angle = []
 frequency = 1  # Frequency in Hz (one cycle per second)
  
 
-while i<1000:
+while i<200:
     action, _states = model.predict(obs)        
     # print("action: ",action)
     cart_pos.append(obs[0])
@@ -64,45 +64,46 @@ time_steps = np.arange(len(actions))
 plt.figure(figsize=(10, 5))
 
 # Plot actions
-plt.plot(time_steps, action_pos, label='Action(desired position)', color='green')
-plt.plot(time_steps, filterd_action_pos, label='filtered desired position', color='blue')
-plt.plot(time_steps, cart_pos, label='Cart Position', color='red')
+# plt.plot(time_steps, action_pos, label='Action(desired position)', color='green')
+# plt.plot(time_steps, filterd_action_pos, label='filtered desired position', color='blue')
+# plt.plot(time_steps, cart_pos, label='Cart Position', color='red')
 
 
-plt.title('Action and filtered action Over Time')
-plt.xlabel('Time Steps(1 step = 0.02s)')
-plt.ylabel('Value[m]')
-plt.grid(True)
-plt.legend()
+# plt.title('Action and filtered action Over Time')
+# plt.xlabel('Time Steps(1 step = 0.02s)')
+# plt.ylabel('Value[m]')
+# plt.grid(True)
+# plt.legend()
 
-# Show the plot
-plt.show()   
+# # Show the plot
+# plt.show()   
     
-plt.plot(time_steps, action_vel, label='Action(desired velocity)', color='red')
-plt.plot(time_steps, filterd_action_vel, label='filtered desired velocity', color='blue')
-plt.plot(time_steps, cart_vel, label='Cart Velocity', color='green')
+# plt.plot(time_steps, action_vel, label='Action(desired velocity)', color='red')
+# plt.plot(time_steps, filterd_action_vel, label='filtered desired velocity', color='blue')
+# plt.plot(time_steps, cart_vel, label='Cart Velocity', color='green')
 
 
 
-plt.title('Action and filtered action Over Time')
-plt.xlabel('Time Steps(1 step = 0.02s)')
-plt.ylabel('Value[m/s]')
-plt.grid(True)
-plt.legend()
+# plt.title('Action and filtered action Over Time')
+# plt.xlabel('Time Steps(1 step = 0.02s)')
+# plt.ylabel('Value[m/s]')
+# plt.grid(True)
+# plt.legend()
  
-plt.show()  
+# plt.show()  
 
 
 plt.plot(time_steps, cart_pos, label='Cart Position', color='red')
 plt.plot(time_steps, cart_vel, label='Cart Velocity', color='green')
 plt.plot(time_steps, pole_angle, label='Pole Angle', color='blue')
-plt.plot(time_steps, pole_angle_vel, label='Pole Angle Vel', color='orange')
+plt.plot(time_steps, pole_angle_vel, label='Pole Angular Velocity', color='orange')
 
 
-plt.title('cart position pole angle Over Time')
-plt.xlabel('Time Steps(1 step = 0.02s)')
-plt.ylabel('Values[m,m/s,rad]')
+plt.title('Trajectory of Cart and Pole Over Time', fontsize = 30)
+plt.xlabel('Time Steps(1 step = 0.02s)', fontsize = 30)
+plt.ylabel('Values[m,m/s,rad,rad/s]', fontsize = 30)
 plt.grid(True)
-plt.legend()
- 
+plt.legend(prop={'size': 25})
+plt.xticks(fontsize=30)
+plt.yticks(fontsize=30) 
 plt.show()  
